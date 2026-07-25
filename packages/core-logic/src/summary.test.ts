@@ -22,6 +22,17 @@ const build = () => {
   });
 };
 
+const buildWithAlignment = () => {
+  const signal = { transcript: rough, prosody };
+  const alignment = alignSegments(rough, segments);
+  const correlation = correlateSegments(signal, segments, alignment);
+  const report = generateSummary(segments, correlation, signal, {
+    reportId: 'rpt-demo-rough',
+    audioUrl: '/fixtures/take-rough.wav',
+  });
+  return { report, alignment };
+};
+
 describe('generateSummary', () => {
   const report = build();
 
@@ -59,5 +70,36 @@ describe('generateSummary', () => {
 
   it('is byte-for-byte deterministic across runs', () => {
     expect(JSON.stringify(build())).toBe(JSON.stringify(build()));
+  });
+
+  it('stamps each non-degraded segment with its alignment startSec/endSec', () => {
+    const { report, alignment } = buildWithAlignment();
+    const byId = new Map(alignment.alignments.map((a) => [a.segmentId, a]));
+    for (const seg of report.segments) {
+      const a = byId.get(seg.id);
+      if (!a || a.degraded) {
+        expect(seg.startSec).toBeUndefined();
+        expect(seg.endSec).toBeUndefined();
+      } else {
+        expect(seg.startSec).toBe(a.startSec);
+        expect(seg.endSec).toBe(a.endSec);
+      }
+    }
+    // At least one real (non-degraded) segment in the rough fixture, so the
+    // "always undefined" branch above can't trivially satisfy this test.
+    expect(report.segments.some((s) => s.startSec !== undefined)).toBe(true);
+  });
+
+  it('round-trips through JSON with the stamped timings intact', () => {
+    const report = build();
+    const roundTripped = JSON.parse(JSON.stringify(report));
+    expect(() => DeliveryReport.parse(roundTripped)).not.toThrow();
+    const withTimings = report.segments.filter((s) => s.startSec !== undefined);
+    expect(withTimings.length).toBeGreaterThan(0);
+    for (const seg of withTimings) {
+      const match = roundTripped.segments.find((s: { id: string }) => s.id === seg.id);
+      expect(match.startSec).toBe(seg.startSec);
+      expect(match.endSec).toBe(seg.endSec);
+    }
   });
 });

@@ -9,17 +9,6 @@
  * from hour 1, and so the merge at h4-6 is a body swap rather than a rebuild.
  */
 
-import type {
-  CorrelationResult,
-  DeliveryReport,
-  DeliverySignal,
-  NextStep,
-  NextStepContext,
-  ScriptSegment,
-  SegmentAlignment,
-  Severity,
-} from '@nsh/contracts';
-
 export * from './align.js';
 export * from './baseline.js';
 export * from './correlate.js';
@@ -30,10 +19,4 @@ export * from './prosody.js';
 export * from './summary.js';
 export * from './thresholds.js';
 export * from './tokenize.js';
-
-/* ------------------------------------------------------------------------ *
- * The six frozen signatures. Bodies land h1-6 — see docs/TEAM_PLANS.md.
- * ------------------------------------------------------------------------ */
-
-const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
 

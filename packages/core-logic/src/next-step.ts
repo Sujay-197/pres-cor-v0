@@ -45,14 +45,14 @@ export function decideNextStep(report: DeliveryReport, ctx: NextStepContext): Ne
     };
   }
 
-  const mentor = ctx.knownMentor;
+  const mentor = ctx.knownMentor?.trim() || null;
   return {
     ...base,
     kind: 'draft_note',
     recipientHint: mentor ? `${mentor} (watched your last rehearsal)` : 'someone who has heard this pitch before',
     draftSubject: 'Could you watch this once?',
     draftBody:
-      `Hi ${mentor ?? 'there'} — I've rehearsed this to the point where solo runs aren't teaching me much. ` +
+      `Hi ${mentor ? mentor : 'there'} — I've rehearsed this to the point where solo runs aren't teaching me much. ` +
       'Do you have 10 minutes this week to listen live and tell me where you stopped believing me?',
     rationale:
       `Nothing on your calendar in the next ${WINDOW_DAYS} days. ` +

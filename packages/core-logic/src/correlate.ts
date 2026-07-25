@@ -275,7 +275,7 @@ export function correlateSegments(
             severity: rule.verdict,
             timestamp: a.startSec,
             segmentId: segment.id,
-            detail: `${a.wpm} WPM vs your ${baseline.avgPaceWpm} WPM average — ${direction} than usual, off a key point.`,
+            detail: `${a.wpm} WPM vs your ${baseline.avgPaceWpm} WPM average — noticeably ${direction} than your usual pace.`,
           },
           trace: {
             segmentId: segment.id,
@@ -295,5 +295,5 @@ export function correlateSegments(
   }
 
   const { issues, trace } = numberIssuePairs(pairs);
-  return { issues, trace, baseline };
+  return { issues, trace, baseline, alignments: alignment.alignments };
 }

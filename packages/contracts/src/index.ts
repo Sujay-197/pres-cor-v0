@@ -257,6 +257,8 @@ export const CorrelationResult = z.object({
   issues: z.array(DeliveryIssue),
   trace: z.array(DecisionTrace),
   baseline: Baseline,
+  /** Passthrough of the alignments correlateSegments was given, so generateSummary can stamp segment timings. */
+  alignments: z.array(SegmentAlignment),
 });
 export type CorrelationResult = z.infer<typeof CorrelationResult>;
 
