@@ -82,9 +82,29 @@ No number-word mapping is needed once hyphens are stripped, and none is
 implemented — it would be a second normalisation path that could disagree with
 the first.
 
-`isFillerToken(token)` tests membership of `FILLER_LEXICON` from contracts.
-Multi-word entries ("you know", "i mean") are matched against the token stream as
-bigrams before single-token matching.
+### Hard and soft fillers
+
+`FILLER_LEXICON` cannot be matched naively. `script.demo.md:11` reads *"I'd like
+to talk about what the next twelve months look like"* — `like` is in the lexicon
+and appears twice as an ordinary word. Tagging it would inflate `fillerCount`
+and, because WPM excludes fillers, corrupt that segment's pace. `right` and
+`actually` carry the same risk.
+
+The lexicon therefore splits in two:
+
+- **Hard fillers** — `uh, um, mm, mhmm, hmm, er, ah`. Never legitimate script
+  words. Always fillers. Deepgram returns these directly under
+  `filler_words=true`.
+- **Soft fillers** — `like, you know, i mean, sort of, kind of, basically,
+  actually, right`. Filler *only when the word does not correspond to a script
+  token*. A hedge is a word you said that you did not plan to say.
+
+This makes filler classification depend on alignment, which resolves cleanly
+because the two classes enter alignment differently (§6).
+
+`fillerMatchLength(tokens, i)` returns 2, 1 or 0, testing multi-word entries as
+bigrams before single tokens. `tagFillers(words)` applies the hard-filler pass
+and is exported for P2's STT adapter, so both sides classify identically.
 
 ## 5. `parseScript(raw): ScriptSegment[]`
 
@@ -109,9 +129,18 @@ every block is empty after stripping markup.
 Needleman-Wunsch global alignment between the script token sequence and the
 transcript token sequence.
 
-**Fillers are excluded from the alignment input.** They exist in the transcript
-and never in the script, so including them only feeds the gap path noise. They
-are re-attributed by timestamp in the final step below.
+**Hard fillers are excluded from the alignment input; soft fillers are not.**
+A hard filler ("um") never appears in a script, so feeding it to the aligner only
+adds gap-path noise. A soft filler ("like") may be a real script word, so it must
+enter alignment to find out. Hard fillers are re-attributed by timestamp in the
+final step below.
+
+Soft fillers are therefore classified *after* alignment: a transcript word is a
+soft filler when it is in the soft lexicon **and** its alignment op is
+`gapScript` — present in the delivery, absent from the script. `like` in
+`seg-006` matches a script token and is scored as content; the same word spoken
+as a tic elsewhere does not match and is scored as a filler. `Word.isFiller` is
+finalised at this point, not at STT time.
 
 Scoring: match `+2`, mismatch `-1`, gap `-1`. Matrix size is bounded by
 `AUDIO_MAX_SECONDS` — at 180s and ~150 WPM that is ~450 × ~500 cells, which is
