@@ -27,6 +27,7 @@ export * from './errors.js';
 export * from './next-step.js';
 export * from './parse-script.js';
 export * from './prosody.js';
+export * from './summary.js';
 export * from './thresholds.js';
 export * from './tokenize.js';
 
@@ -36,12 +37,3 @@ export * from './tokenize.js';
 
 const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
 
-/** tool 4: generate_summary */
-export function generateSummary(
-  _segments: ScriptSegment[],
-  _correlation: CorrelationResult,
-  _signal: DeliverySignal,
-  _meta: { reportId: string; audioUrl: string | null },
-): DeliveryReport {
-  throw new Error(`generateSummary: ${PENDING}`);
-}
