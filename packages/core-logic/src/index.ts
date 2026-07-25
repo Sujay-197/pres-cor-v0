@@ -24,6 +24,7 @@ import type {
 } from '@nsh/contracts';
 
 export * from './errors.js';
+export * from './next-step.js';
 export * from './parse-script.js';
 export * from './thresholds.js';
 export * from './tokenize.js';
@@ -64,11 +65,6 @@ export function generateSummary(
   _meta: { reportId: string; audioUrl: string | null },
 ): DeliveryReport {
   throw new Error(`generateSummary: ${PENDING}`);
-}
-
-/** tool 5: decides the closing action. Never executes it — that is P2's job. */
-export function decideNextStep(_report: DeliveryReport, _ctx: NextStepContext): NextStep {
-  throw new Error(`decideNextStep: ${PENDING}`);
 }
 
 /** Speaker's own norms from this recording. Never a population average. */
