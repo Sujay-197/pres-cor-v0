@@ -42,8 +42,26 @@ export class FixtureContextProvider implements ContextProvider {
   constructor(private readonly fixtureDir: string) {}
 
   async nextStepContext(takeId: string, now: string): Promise<NextStepContext> {
-    const raw = await readFile(join(this.fixtureDir, CONTEXT_FIXTURE), 'utf8');
-    const all = JSON.parse(raw) as Record<string, unknown>;
+    const path = join(this.fixtureDir, CONTEXT_FIXTURE);
+    let all: Record<string, unknown>;
+    try {
+      const raw = await readFile(path, 'utf8');
+      all = JSON.parse(raw) as Record<string, unknown>;
+    } catch (cause) {
+      // Never let a raw fs/JSON error cross the adapter boundary — the
+      // original stays on `context`, never in the message, since messages
+      // reach logs.
+      throw new CoachError('INTERNAL', `Failed to read or parse "${CONTEXT_FIXTURE}".`, {
+        path,
+        cause: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+
+    // Guard the bracket lookup explicitly rather than relying on JSON.parse's
+    // incidental handling of `__proto__` and safeParse rejecting non-plain
+    // results — an unrecognised (or prototype-name) takeId gets the same
+    // clean "unknown take" outcome.
+    if (!Object.hasOwn(all, takeId)) return { ...NEUTRAL_CONTEXT, now };
     const entry = all[takeId];
 
     // The caller's `now` always wins. The value stored in the fixture is the

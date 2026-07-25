@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NextStepContext, type DeliveryReport } from '@nsh/contracts';
-import { decideNextStep } from '@nsh/core-logic';
+import { CoachError, decideNextStep } from '@nsh/core-logic';
 import type { Logger } from '../audit.js';
 import { FIXTURE_DIR } from '../takes.js';
 import {
@@ -51,6 +53,22 @@ describe('FixtureContextProvider', () => {
     const ctx = await provider.nextStepContext('up-0123456789ab', '2026-07-25T09:00:00Z');
     expect(ctx).toEqual({ ...NEUTRAL_CONTEXT, now: '2026-07-25T09:00:00Z' });
     expect(decideNextStep(loadReport('rough'), ctx).kind).toBe('draft_note');
+  });
+
+  it('wraps a missing fixture file as a CoachError(INTERNAL), never a raw fs error', async () => {
+    const provider = new FixtureContextProvider(join(FIXTURE_DIR, 'does-not-exist-dir'));
+    const err = await provider.nextStepContext('rough', '2026-07-25T09:00:00Z').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoachError);
+    expect((err as CoachError).code).toBe('INTERNAL');
+  });
+
+  it('wraps malformed fixture JSON as a CoachError(INTERNAL), never a raw SyntaxError', async () => {
+    const scratchDir = await mkdtemp(join(tmpdir(), 'nsh-connectors-'));
+    await writeFile(join(scratchDir, 'next-step-context.json'), '{ not valid json', 'utf8');
+    const provider = new FixtureContextProvider(scratchDir);
+    const err = await provider.nextStepContext('rough', '2026-07-25T09:00:00Z').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CoachError);
+    expect((err as CoachError).code).toBe('INTERNAL');
   });
 });
 
