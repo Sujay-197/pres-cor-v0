@@ -8,6 +8,10 @@ import { FIXTURE_DIR } from './takes.js';
 import { bootstrap } from './main.js';
 
 const AUDIO_BYTES = Buffer.from('0123456789abcdef');
+// Large enough that a client can read one chunk and abort before the local
+// loopback transfer finishes, so the mid-stream-abort test actually exercises
+// the abort path instead of racing a transfer that completes instantly.
+const BIG_AUDIO_BYTES = Buffer.alloc(8 * 1024 * 1024, 7);
 
 let base: string;
 let close: () => Promise<void>;
@@ -20,6 +24,7 @@ beforeAll(async () => {
   uploadDir = join(audioDir, 'uploads');
   mkdirSync(uploadDir, { recursive: true });
   writeFileSync(join(audioDir, 'take-rough.m4a'), AUDIO_BYTES);
+  writeFileSync(join(audioDir, 'take-big.wav'), BIG_AUDIO_BYTES);
 
   const booted = await bootstrap(
     loadConfig({ PORT: '0', STT_PROVIDER: 'fixture', ENABLE_PROSODY: 'false', UPLOAD_MAX_BYTES: '64' }),
@@ -95,12 +100,52 @@ describe('GET /api/audio/:takeId', () => {
     expect(res.headers.get('content-range')).toBe(`bytes */${AUDIO_BYTES.length}`);
   });
 
+  it('rejects a non-numeric range with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=abc-' } });
+    expect(res.status).toBe(416);
+  });
+
+  it('rejects an inverted range (start past end) with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=500-100' } });
+    expect(res.status).toBe(416);
+  });
+
+  it('rejects a zero-length suffix range with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=-0' } });
+    expect(res.status).toBe(416);
+  });
+
   it('404s a take with no audio on disk', async () => {
     const res = await fetch(`${base}/api/audio/clean`);
     expect(res.status).toBe(404);
     expect((await res.json()) as unknown).toEqual({
       error: { code: 'NOT_FOUND', message: 'No audio for take "clean".' },
     });
+  });
+
+  it('404s a percent-encoded path-traversal attempt using forward slashes', async () => {
+    const res = await fetch(`${base}/api/audio/..%2f..%2f..%2fetc%2fpasswd`);
+    expect(res.status).toBe(404);
+  });
+
+  it('404s a percent-encoded path-traversal attempt using backslashes', async () => {
+    const res = await fetch(`${base}/api/audio/..%5c..%5cwindows%5cwin.ini`);
+    expect(res.status).toBe(404);
+  });
+
+  it('survives a client aborting mid-stream and keeps serving later requests', async () => {
+    const res = await fetch(`${base}/api/audio/big`);
+    expect(res.status).toBe(200);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+
+    // Give the server a beat to process the aborted connection before
+    // asserting it is still alive and answering normally.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const after = await fetch(`${base}/api/health`);
+    expect(after.status).toBe(200);
   });
 });
 
@@ -134,6 +179,31 @@ describe('POST /api/analyze', () => {
     const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe('SCRIPT_EMPTY');
     expect(body.error.message).not.toBe(GENERIC_MESSAGE);
+  });
+
+  it('400s malformed JSON in the standard envelope without leaking a stack trace', async () => {
+    const res = await fetch(`${base}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"takeId":',
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Invalid request body.' } });
+    const raw = JSON.stringify(body);
+    expect(raw).not.toContain('SyntaxError');
+    expect(raw).not.toContain('node_modules');
+  });
+});
+
+describe('unmatched routes', () => {
+  it('404s in the standard envelope instead of the Express HTML page', async () => {
+    const res = await fetch(`${base}/api/definitely-not-a-route`);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('NOT_FOUND');
   });
 });
 
@@ -170,6 +240,17 @@ describe('POST /api/tools/:name', () => {
     expect(res.status).toBe(502);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('STT_FAILED');
   });
+
+  // TOOLS is a plain object literal, so bracket access without an explicit
+  // own-property guard resolves inherited Object.prototype members instead of
+  // undefined for these names — the dispatcher must not treat that as "found".
+  for (const name of ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty']) {
+    it(`404s "${name}" instead of dispatching to an inherited Object.prototype member`, async () => {
+      const res = await postJson(`/api/tools/${name}`, {});
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+    });
+  }
 });
 
 describe('POST /api/uploads', () => {

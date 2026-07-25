@@ -25,7 +25,10 @@ export async function bootstrap(
   const app = createApp(deps);
 
   const server = await new Promise<Server>((resolve, reject) => {
-    const listener = app.listen(cfg.port);
+    // Bind loopback only: /api/uploads accepts arbitrary files with no
+    // authentication, and the default 0.0.0.0 bind would expose it to the
+    // whole LAN.
+    const listener = app.listen(cfg.port, '127.0.0.1');
     listener.once('listening', () => resolve(listener));
     listener.once('error', reject);
   });
@@ -39,7 +42,13 @@ export async function bootstrap(
     server,
     port,
     deps,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    close: () =>
+      new Promise<void>((resolve) => {
+        // A keep-alive socket left idle would otherwise hold server.close()'s
+        // callback open indefinitely.
+        server.closeIdleConnections();
+        server.close(() => resolve());
+      }),
   };
 }
 

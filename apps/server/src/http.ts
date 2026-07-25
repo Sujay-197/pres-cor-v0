@@ -7,7 +7,8 @@
 
 import { createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import express, { type Express, type Request, type Response } from 'express';
+import { pipeline } from 'node:stream';
+import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { describeConfig } from './config.js';
@@ -53,6 +54,17 @@ const TOOLS: Record<string, { takeIdOf: (body: unknown) => string | null; run: T
 
 export const TOOL_NAMES: readonly string[] = Object.keys(TOOLS);
 
+/**
+ * `TOOLS` is a plain object literal, so it inherits from Object.prototype:
+ * `TOOLS['constructor']`, `TOOLS['__proto__']`, `TOOLS['toString']` etc. all
+ * resolve to something other than `undefined` via bracket access even though
+ * none of them is an own, registered tool. `Object.hasOwn` makes the allow-list
+ * explicit instead of relying on "happens to be undefined" as the guard.
+ */
+function lookupTool(name: string): (typeof TOOLS)[string] | undefined {
+  return Object.hasOwn(TOOLS, name) ? TOOLS[name] : undefined;
+}
+
 function sendNotFound(res: Response, message: string): void {
   res.status(404).json({ error: { code: 'NOT_FOUND', message } });
 }
@@ -79,6 +91,44 @@ function sendError(res: Response, err: unknown, deps: ServerDeps): void {
   res.status(mapped.status).json(mapped.body);
 }
 
+/**
+ * express.json() (body-parser) throws BEFORE any route's try/catch can see
+ * it, so a malformed or oversized request body would otherwise reach
+ * Express's default error handler — which, in the default 'development' env,
+ * echoes `err.stack` (vendor/internal detail, absolute node_modules paths)
+ * straight into the HTTP response. Recognised here so the terminal error
+ * middleware in createApp can answer with the mandated envelope instead.
+ */
+function bodyParserErrorStatus(err: unknown): 400 | 413 | null {
+  if (typeof err !== 'object' || err === null) return null;
+  const type = (err as { type?: unknown }).type;
+  if (type === 'entity.too.large') return 413;
+  if (type === 'entity.parse.failed') return 400;
+  if (err instanceof SyntaxError && 'body' in err) return 400;
+  return null;
+}
+
+/**
+ * `.pipe()` only attaches its error handler to the DESTINATION; a read-stream
+ * error (file removed after statSync, EACCES, EMFILE from too many concurrent
+ * seeks) has no listener on the source and throws as an uncaught exception,
+ * which the surrounding route try/catch cannot see because it only wraps the
+ * synchronous call that kicks the stream off. `pipeline` also destroys both
+ * ends the moment either side closes early — which is exactly what happens on
+ * every scrubber seek that aborts an in-flight range request — so a burst of
+ * seeks cannot leak a file descriptor per abort.
+ */
+function pipeAudio(source: NodeJS.ReadableStream, res: Response, deps: ServerDeps): void {
+  pipeline(source, res, (err) => {
+    if (err !== null && err !== undefined) {
+      deps.log('warn', 'audio.stream_error', {
+        code: (err as NodeJS.ErrnoException).code ?? null,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+}
+
 function serveAudio(req: Request, res: Response, deps: ServerDeps): void {
   const takeId = req.params['takeId'] ?? '';
   const found = resolveTakeAudio(deps.audioDir, deps.uploadDir, takeId);
@@ -94,7 +144,7 @@ function serveAudio(req: Request, res: Response, deps: ServerDeps): void {
   const range = req.headers.range;
   if (range === undefined) {
     res.setHeader('Content-Length', String(size));
-    createReadStream(found.path).pipe(res);
+    pipeAudio(createReadStream(found.path), res, deps);
     return;
   }
 
@@ -126,7 +176,7 @@ function serveAudio(req: Request, res: Response, deps: ServerDeps): void {
   res.status(206);
   res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
   res.setHeader('Content-Length', String(end - start + 1));
-  createReadStream(found.path, { start, end }).pipe(res);
+  pipeAudio(createReadStream(found.path, { start, end }), res, deps);
 }
 
 export function createApp(deps: ServerDeps): Express {
@@ -208,7 +258,7 @@ export function createApp(deps: ServerDeps): Express {
 
   app.post('/api/tools/:name', async (req, res) => {
     const name = req.params['name'] ?? '';
-    const tool = TOOLS[name];
+    const tool = lookupTool(name);
     if (tool === undefined) {
       sendNotFound(res, `Unknown tool "${name}".`);
       return;
@@ -220,6 +270,35 @@ export function createApp(deps: ServerDeps): Express {
     } catch (err) {
       sendError(res, err, deps);
     }
+  });
+
+  // Catch-all: any path/method that didn't match a route above gets the
+  // mandated envelope instead of Express's default HTML "Cannot GET /x" page.
+  app.use((req, res) => {
+    sendNotFound(res, `No route for ${req.method} ${req.path}.`);
+  });
+
+  // Terminal error handler. Must be registered last and keep all four
+  // parameters (Express dispatches by handler arity) so a body-parser
+  // SyntaxError/entity.too.large — or anything else thrown before a route's
+  // own try/catch could see it — lands here instead of Express's default
+  // handler, which in the default 'development' env echoes `err.stack`
+  // straight into the response body (design §10: internal detail never
+  // crosses the boundary).
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    const bodyParserStatus = bodyParserErrorStatus(err);
+    if (bodyParserStatus !== null) {
+      deps.log('warn', 'request.invalid', { status: bodyParserStatus, source: 'body-parser' });
+      if (bodyParserStatus === 413) {
+        res
+          .status(413)
+          .json({ error: { code: 'UPLOAD_TOO_LARGE', message: 'Request body exceeds the allowed size.' } });
+      } else {
+        res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Invalid request body.' } });
+      }
+      return;
+    }
+    sendError(res, err, deps);
   });
 
   return app;
