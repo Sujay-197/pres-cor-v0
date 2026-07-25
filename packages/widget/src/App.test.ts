@@ -1,5 +1,6 @@
 import type { DeliveryReport } from '@nsh/contracts';
 import cleanFixture from '../../contracts/fixtures/report.clean.json';
+import roughFixture from '../../contracts/fixtures/report.rough.json';
 import {
   ApiError,
   OFFLINE_TAKES,
@@ -7,7 +8,9 @@ import {
   executeNextStep,
   fetchTakes,
   offlineReport,
+  runTakeLoad,
   uploadTake,
+  type TakeLoadResult,
 } from './App';
 
 interface Call {
@@ -32,7 +35,16 @@ test('fetchTakes unwraps the takes array', async () => {
   );
   const takes = await fetchTakes(f);
   expect(takes).toHaveLength(1);
-  expect(takes[0]!.id).toBe('rough');
+  // Full-shape assertion (not just `.id`): a server-side rename of `label`,
+  // `mimeType` or `hasFrozenTranscript` would not fail an `.id`-only check,
+  // and the widget's TakeOption is a duplicated type, not one shared with
+  // the server, so drift has to be caught here.
+  expect(takes[0]).toEqual({
+    id: 'rough',
+    label: 'Rough take',
+    mimeType: 'audio/mp4',
+    hasFrozenTranscript: true,
+  });
   expect(calls[0]!.url).toBe('/api/takes');
 });
 
@@ -108,4 +120,74 @@ test('offlineReport returns a fresh clone each call so the widget cannot mutate 
 test('OFFLINE_TAKES covers exactly the two staged takes', () => {
   expect(OFFLINE_TAKES.map((t) => t.id)).toEqual(['clean', 'rough']);
   expect(OFFLINE_TAKES.every((t) => t.hasFrozenTranscript)).toBe(true);
+});
+
+/* ---------------------------------------------------------------------- *
+ * runTakeLoad — race/cancellation guard. `f` here never resolves on its
+ * own: each call to `f` parks its resolver, and the test decides the
+ * settlement order, so these tests can force exactly the out-of-order
+ * network arrival that a real slow response / fast response race produces.
+ * ---------------------------------------------------------------------- */
+
+function deferredFetch(): { f: typeof fetch; resolvers: Array<(res: Response) => void> } {
+  const resolvers: Array<(res: Response) => void> = [];
+  const f = (async () =>
+    await new Promise<Response>((resolve) => {
+      resolvers.push(resolve);
+    })) as unknown as typeof fetch;
+  return { f, resolvers };
+}
+
+// `Response.json()` resolves over a macrotask under Node's implementation
+// (a handful of `await Promise.resolve()` ticks is not enough to observe
+// it settle), so this drains a real macrotask turn — twice, to give both a
+// slower and a faster chain equal room to fully settle before assertions
+// run. Verified against both a guarded and an unguarded runTakeLoad to
+// confirm this ordering is what actually distinguishes them, not timing luck.
+const flush = async (): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
+test('a stale response cannot overwrite a newer one once its load has been cancelled', async () => {
+  const { f, resolvers } = deferredFetch();
+  const results: TakeLoadResult[] = [];
+
+  // Mirrors the App effect: takeId changes from "clean" to "rough", React
+  // tears down the old effect (cancelling the in-flight "clean" load)
+  // before the new effect for "rough" starts.
+  const cancelClean = runTakeLoad('clean', (r) => results.push(r), f);
+  cancelClean();
+  runTakeLoad('rough', (r) => results.push(r), f);
+
+  // Resolve out of order: the newer ("rough") request settles first, and
+  // the stale, already-cancelled ("clean") request arrives late — both
+  // fired before any await, so neither gets a timing head start.
+  resolvers[1]!(json(roughFixture));
+  resolvers[0]!(json(cleanFixture));
+  await flush();
+
+  expect(results).toHaveLength(1);
+  expect(results[0]).toMatchObject({ status: 'ready', offline: false });
+  expect((results[0] as { report: DeliveryReport }).report.reportId).toBe('rpt-demo-rough');
+});
+
+test('a cancelled first invocation cannot clobber the surviving second one (StrictMode double-invoke)', async () => {
+  const { f, resolvers } = deferredFetch();
+  const results: TakeLoadResult[] = [];
+
+  // StrictMode mounts, runs the effect, immediately cleans it up, then runs
+  // it again — two loads for the SAME take, back to back.
+  const cancelFirst = runTakeLoad('rough', (r) => results.push(r), f);
+  cancelFirst();
+  runTakeLoad('rough', (r) => results.push(r), f);
+
+  // The cancelled first invocation's network response happens to land after
+  // the surviving second invocation's.
+  resolvers[1]!(json(roughFixture));
+  resolvers[0]!(json(roughFixture));
+  await flush();
+
+  expect(results).toHaveLength(1);
+  expect(results[0]).toMatchObject({ status: 'ready', offline: false });
 });

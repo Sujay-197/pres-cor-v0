@@ -107,6 +107,62 @@ export function offlineReport(takeId: string): DeliveryReport | null {
   return structuredClone(fixture) as DeliveryReport;
 }
 
+/* ---------------------------------------------------------------------- *
+ * Guarded take load. Pulled out of the component so the race/cancellation
+ * discipline is unit-testable without a DOM (the widget's vitest config runs
+ * in `environment: 'node'` — there is no render() here). The `load` effect
+ * below is just: call this, hand its cancel() to the effect cleanup.
+ * ---------------------------------------------------------------------- */
+
+export type TakeLoadResult =
+  | { status: 'ready'; report: DeliveryReport; offline: false }
+  | { status: 'ready'; report: DeliveryReport; offline: true; notice: string }
+  | { status: 'error'; notice: string };
+
+/**
+ * Runs analyzeTake for `takeId` and reports the outcome to `onResult`,
+ * falling back to the matching offline fixture on failure. Returns a
+ * `cancel()` function: calling it — e.g. from a React effect's cleanup when
+ * `takeId` changes again before this call has settled — suppresses the
+ * `onResult` callback, so a stale response can never overwrite a newer one.
+ * This is also what protects against React StrictMode's mount → cleanup →
+ * mount double-invoke firing two concurrent loads for the same take: the
+ * first invocation's cleanup cancels it before the second one's result can
+ * land, so no state update happens twice.
+ */
+export function runTakeLoad(
+  takeId: string,
+  onResult: (result: TakeLoadResult) => void,
+  f: typeof fetch = fetch,
+): () => void {
+  let cancelled = false;
+  analyzeTake(takeId, null, f)
+    .then((live) => {
+      if (cancelled) return;
+      onResult({ status: 'ready', report: live, offline: false });
+    })
+    .catch((err: unknown) => {
+      if (cancelled) return;
+      const fallback = offlineReport(takeId);
+      if (fallback !== null) {
+        onResult({
+          status: 'ready',
+          report: fallback,
+          offline: true,
+          notice: 'Server unreachable — showing the committed fixture for this take.',
+        });
+        return;
+      }
+      onResult({
+        status: 'error',
+        notice: err instanceof ApiError ? `${err.code}: ${err.message}` : 'Analysis failed.',
+      });
+    });
+  return () => {
+    cancelled = true;
+  };
+}
+
 /* ---------------------------------------------------------------------- */
 
 type Phase = 'loading' | 'ready' | 'error';
@@ -119,6 +175,18 @@ export default function App() {
   const [offline, setOffline] = useState(false);
   const [notice, setNotice] = useState<string>('');
   const fileInput = useRef<HTMLInputElement | null>(null);
+
+  // Cleared on unmount; onUpload/onExecute are callbacks, not effects, so
+  // they cannot return a cleanup function of their own — this ref is what
+  // stops a late-arriving response from calling setState after the widget
+  // has gone away.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,32 +206,28 @@ export default function App() {
     };
   }, []);
 
-  const load = useCallback((id: string) => {
+  // takeId changes (tab switch, or an upload landing) run this effect again.
+  // React tears down the previous run's cleanup — which calls cancel() below
+  // — before the new run starts, so an in-flight load for the take we just
+  // navigated away from can never land after the one we navigated to. The
+  // same cancel-before-restart sequencing is what protects against
+  // StrictMode's mount → cleanup → mount double-invoke of this same effect.
+  useEffect(() => {
     setPhase('loading');
     setNotice('');
-    analyzeTake(id)
-      .then((live) => {
-        setReport(live);
+    const cancel = runTakeLoad(takeId, (result) => {
+      if (result.status === 'ready') {
+        setReport(result.report);
         setPhase('ready');
-        setOffline(false);
-      })
-      .catch((err: unknown) => {
-        const fallback = offlineReport(id);
-        if (fallback !== null) {
-          setReport(fallback);
-          setPhase('ready');
-          setOffline(true);
-          setNotice('Server unreachable — showing the committed fixture for this take.');
-          return;
-        }
+        setOffline(result.offline);
+        if (result.offline) setNotice(result.notice);
+      } else {
         setPhase('error');
-        setNotice(err instanceof ApiError ? `${err.code}: ${err.message}` : 'Analysis failed.');
-      });
-  }, []);
-
-  useEffect(() => {
-    load(takeId);
-  }, [takeId, load]);
+        setNotice(result.notice);
+      }
+    });
+    return cancel;
+  }, [takeId]);
 
   const onUpload = useCallback(
     (file: File) => {
@@ -171,10 +235,13 @@ export default function App() {
       setNotice(`Uploading ${file.name}…`);
       uploadTake(file)
         .then(async (id) => {
-          setTakes(await fetchTakes());
+          const live = await fetchTakes();
+          if (!mountedRef.current) return;
+          setTakes(live);
           setTakeId(id);
         })
         .catch((err: unknown) => {
+          if (!mountedRef.current) return;
           setPhase('error');
           setNotice(err instanceof ApiError ? `${err.code}: ${err.message}` : 'Upload failed.');
         });
@@ -186,8 +253,12 @@ export default function App() {
     (step: NextStep) => {
       if (report === null || offline) return;
       executeNextStep(report, takeId)
-        .then((executed) => setReport((prev) => (prev === null ? prev : { ...prev, nextStep: executed })))
+        .then((executed) => {
+          if (!mountedRef.current) return;
+          setReport((prev) => (prev === null ? prev : { ...prev, nextStep: executed }));
+        })
         .catch((err: unknown) => {
+          if (!mountedRef.current) return;
           setNotice(err instanceof ApiError ? `${err.code}: ${err.message}` : `Could not execute ${step.kind}.`);
         });
     },
