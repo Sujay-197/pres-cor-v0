@@ -15,7 +15,6 @@ import type {
   DeliverySignal,
   NextStep,
   NextStepContext,
-  ProsodyTrack,
   ScriptSegment,
   SegmentAlignment,
   Severity,
@@ -26,6 +25,7 @@ export * from './baseline.js';
 export * from './errors.js';
 export * from './next-step.js';
 export * from './parse-script.js';
+export * from './prosody.js';
 export * from './thresholds.js';
 export * from './tokenize.js';
 
@@ -34,11 +34,6 @@ export * from './tokenize.js';
  * ------------------------------------------------------------------------ */
 
 const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
-
-/** tool 2b: deterministic half of transcribe_delivery. Pure DSP. */
-export function extractProsody(_pcm: Float32Array, _sampleRate: number): ProsodyTrack {
-  throw new Error(`extractProsody: ${PENDING}`);
-}
 
 /** tool 3b: THE BRANCH. Cross-references script intent against delivery signal. */
 export function correlateSegments(

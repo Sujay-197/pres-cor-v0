@@ -314,7 +314,11 @@ export interface CoreLogic {
   extractProsody(pcm: Float32Array, sampleRate: number): ProsodyTrack;
 
   /** tool 3a: map each script segment onto its region of the recording. */
-  alignSegments(transcript: Transcript, segments: ScriptSegment[]): AlignmentResult;
+  alignSegments(
+    transcript: Transcript,
+    segments: ScriptSegment[],
+    prosody?: ProsodyTrack,
+  ): AlignmentResult;
 
   /** tool 3b: THE BRANCH. Cross-reference script intent against delivery signal. */
   correlateSegments(

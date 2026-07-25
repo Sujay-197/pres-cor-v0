@@ -1,4 +1,4 @@
-import type { AlignmentResult, ScriptSegment, SegmentAlignment, Transcript } from '@nsh/contracts';
+import type { AlignmentResult, ProsodyTrack, ScriptSegment, SegmentAlignment, Transcript } from '@nsh/contracts';
 import { CoachError } from './errors.js';
 import { THRESHOLDS } from './thresholds.js';
 import { isHardFiller, isSoftFiller, normaliseText } from './tokenize.js';
@@ -82,6 +82,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 export function alignSegments(
   transcript: Transcript,
   segments: ScriptSegment[],
+  prosody: ProsodyTrack = { frames: [], frameHopSec: 0.01 },
 ): AlignmentResult {
   // --- script side: flatten to tokens, remembering which segment owns each ---
   const scriptTokens: string[] = [];
@@ -191,6 +192,13 @@ export function alignSegments(
     const contentWords = inRange.filter((w) => !w.isFiller).length;
     const fillerCount = inRange.filter((w) => w.isFiller).length;
 
+    const inWindow = prosody.frames.filter((f) => f.t >= startSec && f.t < endSec);
+    const voiced = inWindow.map((f) => f.f0).filter((f): f is number => f !== null);
+    const meanRms = inWindow.length > 0
+      ? inWindow.reduce((s, f) => s + f.rms, 0) / inWindow.length : 0;
+    const meanF0 = voiced.length > 0
+      ? voiced.reduce((s, f) => s + f, 0) / voiced.length : null;
+
     alignments.push({
       segmentId: seg.id,
       startSec,
@@ -199,8 +207,8 @@ export function alignSegments(
       wordIdxEnd,
       wpm: r1(duration > 0 ? (contentWords / duration) * 60 : 0),
       fillerCount,
-      meanRms: 0, // filled by Task 11; zero-frame prosody is valid
-      meanF0: null,
+      meanRms: r1(meanRms),
+      meanF0: meanF0 === null ? null : r1(meanF0),
       precedingPauseSec: r1(Math.max(startSec - prevEnd, 0)),
       degraded,
     });
