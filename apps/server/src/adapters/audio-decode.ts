@@ -49,7 +49,9 @@ export function decodeWithFfmpeg(
       'pipe:1',
     ];
 
-    const child = spawn(ffmpegBinary, args);
+    // stdio: nothing is ever written to stdin, so keep it closed. windowsHide
+    // stops the ffmpeg child from flashing a console window on Windows hosts.
+    const child = spawn(ffmpegBinary, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     const chunks: Buffer[] = [];
     let stderr = '';
 
