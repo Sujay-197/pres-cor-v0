@@ -284,6 +284,51 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
   high: '#ef4444',
 };
 
+/**
+ * Widget-facing display labels. Additive constants owned by P3, kept here so
+ * the timeline legend, summary card, and deck read from one source. Pure
+ * presentation — nothing in core-logic depends on these.
+ */
+export const SEVERITY_LABEL: Record<Severity, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
+export const ISSUE_TYPE_LABEL: Record<IssueType, string> = {
+  filler: 'Filler word',
+  pacing: 'Pacing drift',
+  stress_mismatch: 'Stress / emphasis mismatch',
+  pause: 'Pause',
+};
+
+/**
+ * Schemes the widget's <audio> element is allowed to load. Guards against a
+ * report smuggling a javascript: or file: URL into the scrubber. Relative
+ * paths (fixtures served by the dev server) are always allowed.
+ */
+export const AUDIO_URL_SCHEMES = ['http:', 'https:', 'blob:', 'data:'] as const;
+
+export function isAllowedAudioUrl(url: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('/')) return true;
+  try {
+    const u = new URL(url);
+    if (!AUDIO_URL_SCHEMES.includes(u.protocol as (typeof AUDIO_URL_SCHEMES)[number])) return false;
+    if (u.protocol === 'data:') {
+      const rest = u.pathname.slice(0, 32).toLowerCase();
+      return (
+        rest.startsWith('audio/') ||
+        rest.startsWith('video/') ||
+        rest.startsWith('application/octet-stream')
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Script markup understood by parseScript(). See CONVENTIONS.md. */
 export const SCRIPT_MARKUP = {
   /** Segments are separated by a blank line. */
