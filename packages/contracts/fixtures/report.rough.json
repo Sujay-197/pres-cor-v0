@@ -1,11 +1,6 @@
 {
   "reportId": "rpt-demo-rough",
   "contractVersion": "1.0.0",
-  "durationSec": 45.8,
-  "audioUrl": "/fixtures/take-rough.wav",
-  "status": "ready",
-  "fillerCount": 6,
-  "avgPaceWpm": 128.9,
   "segments": [
     {
       "id": "seg-001",
@@ -47,85 +42,66 @@
   "issues": [
     {
       "id": "iss-001",
-      "type": "filler",
+      "type": "pacing",
       "severity": "low",
-      "timestamp": 7.9,
-      "segmentId": "seg-002",
-      "detail": "\"um\" on a setup line. Low stakes — no action needed."
+      "timestamp": 0.5,
+      "segmentId": "seg-001",
+      "detail": "94.3 WPM vs your 143.9 WPM average — slower than usual, off a key point."
     },
     {
       "id": "iss-002",
       "type": "filler",
       "severity": "low",
-      "timestamp": 11.2,
-      "segmentId": "seg-002",
-      "detail": "\"you know\" on a setup line. Low stakes — no action needed."
+      "timestamp": 3.4,
+      "segmentId": "seg-001",
+      "detail": "\"like\" on a low-stakes line. Worth noting, not worth fixing."
     },
     {
       "id": "iss-003",
-      "type": "pause",
-      "severity": "medium",
-      "timestamp": 13.9,
-      "segmentId": "seg-003",
-      "detail": "Your script marks a pause before this line. You left 0.4s — you normally leave 1.6s. The setup for your key stat lands flat."
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 8.4,
+      "segmentId": "seg-002",
+      "detail": "106.9 WPM vs your 143.9 WPM average — slower than usual, off a key point."
     },
     {
       "id": "iss-004",
-      "type": "stress_mismatch",
-      "severity": "high",
-      "timestamp": 14.2,
-      "segmentId": "seg-003",
-      "detail": "181 WPM vs your 129 WPM average — 40% faster, with pitch rising 18% across the line. This is your key stat and you delivered it like a caveat."
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 14,
+      "segmentId": "seg-002",
+      "detail": "\"like i mean\" on a low-stakes line. Worth noting, not worth fixing."
     },
     {
       "id": "iss-005",
-      "type": "filler",
+      "type": "pacing",
       "severity": "low",
-      "timestamp": 20.9,
+      "timestamp": 25.6,
       "segmentId": "seg-004",
-      "detail": "\"basically\" mid-explanation. Low stakes on its own."
+      "detail": "186.7 WPM vs your 143.9 WPM average — faster than usual, off a key point."
     },
     {
       "id": "iss-006",
-      "type": "filler",
-      "severity": "low",
-      "timestamp": 23.1,
-      "segmentId": "seg-004",
-      "detail": "\"sort of\" mid-explanation. Low stakes on its own."
-    },
-    {
-      "id": "iss-007",
-      "type": "filler",
-      "severity": "medium",
-      "timestamp": 25.0,
-      "segmentId": "seg-004",
-      "detail": "Third filler in this segment — 3 in 14 words. Density, not any single word, is what makes this one worth fixing."
-    },
-    {
-      "id": "iss-008",
-      "type": "filler",
-      "severity": "medium",
-      "timestamp": 28.4,
+      "type": "stress_mismatch",
+      "severity": "high",
+      "timestamp": 30.6,
       "segmentId": "seg-005",
-      "detail": "\"I mean\" immediately before your ARR number. A hedge in front of your second key claim."
-    },
-    {
-      "id": "iss-009",
-      "type": "pacing",
-      "severity": "low",
-      "timestamp": 36.4,
-      "segmentId": "seg-006",
-      "detail": "118 WPM vs your 129 WPM average. Slight slow-down on the close — within normal drift."
+      "detail": "180 WPM vs your 143.9 WPM average — 25% faster. This is a key point and you delivered it like a caveat."
     }
   ],
+  "fillerCount": 2,
+  "avgPaceWpm": 143.9,
+  "durationSec": 38.7,
+  "audioUrl": "/fixtures/take-rough.wav",
+  "status": "ready",
   "nextStep": {
-    "kind": "calendar_reminder",
-    "rationale": "\"Northwind investor call\" is on your calendar in 2 days. One high-severity issue is unresolved (key stat at seg-003), so this report is worth re-reading close to the event rather than now.",
     "executed": false,
     "eventTitle": "Northwind investor call",
     "eventStartsAt": "2026-07-27T14:00:00Z",
     "recipientHint": null,
     "draftSubject": null,
-    "draftBody": null
+    "draftBody": null,
+    "kind": "calendar_reminder",
+    "rationale": "\"Northwind investor call\" is on your calendar in 2 days. 1 high-severity issue is unresolved, so this report is worth re-reading close to the event."
   }
 }

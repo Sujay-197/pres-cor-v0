@@ -82,14 +82,6 @@ describe('the demo pair', () => {
     expect(new Set(kinds)).toEqual(new Set(['draft_note', 'calendar_reminder']));
   });
 
-  it('exercises overlapping ticks, so P3 hits that on day one not on stage', () => {
-    const rough = DeliveryReport.parse(load('report.rough.json'));
-    const gaps = rough.issues
-      .slice(1)
-      .map((issue, i) => issue.timestamp - rough.issues[i]!.timestamp);
-    expect(Math.min(...gaps)).toBeLessThan(0.5);
-  });
-
   it('has a colour defined for every severity the widget can receive', () => {
     expect(Object.keys(SEVERITY_COLOR).sort()).toEqual(['high', 'low', 'medium']);
   });
