@@ -1958,7 +1958,7 @@ export class FixtureContextProvider implements ContextProvider {
 
 /** Deterministic synthetic id — no Date.now(), so a report stays reproducible. */
 const syntheticId = (prefix: string, parts: Array<string | null>): string =>
-  `${prefix}${createHash('sha256').update(parts.join(' ')).digest('hex').slice(0, 12)}`;
+  `${prefix}${createHash('sha256').update(parts.join('\0')).digest('hex').slice(0, 12)}`;
 
 export class FixtureCalendarConnector implements CalendarConnector {
   constructor(private readonly log?: Logger) {}
