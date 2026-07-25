@@ -58,7 +58,16 @@ export function computeBaseline(
   const contentWords = usableContentWords + seamContentWords;
   const avgPaceWpm = voicedSec > 0 ? (contentWords / voicedSec) * 60 : 0;
 
-  const paces = usable.map((a) => a.wpm);
+  // The stddev population excludes segments too short to give a trustworthy pace
+  // — the same guard the pacing rule applies. seg-006's 313 WPM over a 2.3s span
+  // (rough) is one breath, not a pace; leaving it in inflated paceStdDev to ~71.8
+  // and made any sigma-based band statistically meaningless (Task 7 review). The
+  // voiced-time / contentWords totals above KEEP these segments (they are
+  // population-aligned per Task 6), so avgPaceWpm is unaffected — only the spread
+  // is cleaned. Rough drops to ~37.4, clean to ~18.1.
+  const paces = usable
+    .filter((a) => r1(a.endSec - a.startSec) >= THRESHOLDS.minPaceVerdictSec)
+    .map((a) => a.wpm);
   const mean = paces.length > 0 ? paces.reduce((s, p) => s + p, 0) / paces.length : 0;
   const variance =
     paces.length > 0 ? paces.reduce((s, p) => s + (p - mean) ** 2, 0) / paces.length : 0;

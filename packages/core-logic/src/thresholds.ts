@@ -6,16 +6,44 @@ export const THRESHOLDS = {
   /** A gap longer than this between words counts as a pause, in seconds. */
   pauseMinSec: 0.35,
   /**
-   * Pace beyond baseline ± this many standard deviations is drift.
-   * Lowered from 1.5 to 0.4 (Task 7): seg-006's short-span 313 WPM end-blurt
-   * inflates paceStdDev to ~71.8, pushing the rush ceiling at 1.5σ to ~252 WPM
-   * — unreachable by seg-005's genuine 180 WPM rush on a ~143.9 WPM baseline.
-   * At 0.4σ the ceiling is ~172.6 WPM: seg-005 (180 WPM) clears it, seg-003
-   * (150 WPM, honours its marked pause) stays clean. Task 9's duration guard
-   * keeps that same short-span outlier out of the pacing verdicts so this
-   * tighter band doesn't have to compensate for it forever.
+   * A key-point segment whose WPM is at least this fraction above the speaker's
+   * own baseline is rushed. Percent-above-baseline, not a sigma band.
+   *
+   * Task 7 used `avgPaceWpm + 0.4σ`, but paceStdDev was polluted: seg-006's
+   * 313 WPM over a 2.3s span inflated it to ~71.8, so a sigma multiplier was
+   * chosen to compensate for the outlier rather than to express a real spread —
+   * statistically meaningless (Task 7 review, carried into Task 9). Two guards
+   * fix the root cause: baseline.ts now drops sub-minPaceVerdictSec spans from
+   * the stddev population, and this rule no longer touches stddev at all.
+   *
+   * Measured: rough baseline avg 143.9 WPM -> ceiling 172.7. seg-005's genuine
+   * 180 WPM rush (the red tick) clears it; seg-003 at 150 WPM (honours its
+   * marked pause) stays clean. Clean baseline avg 146.6 -> ceiling 175.9, above
+   * both clean key points (135.5, 134.1), so the clean take fires no stress.
    */
-  paceDriftSigma: 0.4,
+  stressRushPct: 0.2,
+  /**
+   * An ordinary (non-key) segment whose WPM deviates from baseline by more than
+   * this fraction, in EITHER direction, is a pacing drift. Two-sided: a slow,
+   * rambling open is as coachable as a fast line. Percent, not sigma — the same
+   * reasoning as stressRushPct; with the outlier removed the cleaned stddev is
+   * legitimate but a bare multiplier is far less legible than a percent band.
+   *
+   * Measured at 0.10: rough (avg 143.9) flags seg-001 (-34.5%), seg-002
+   * (-25.7%) and seg-004 (+29.7%); clean (avg 146.6) flags seg-001 (-23.7%)
+   * and seg-002 (+11.6%). seg-004 clean (+5.9%) stays inside the band.
+   * pacing.drift is always low-severity, so this never threatens the
+   * "clean take all low" invariant regardless of how many it flags.
+   */
+  pacingDriftPct: 0.1,
+  /**
+   * A segment shorter than this (rounded span, seconds) cannot produce a
+   * trustworthy pace verdict — WPM over a ~2-3s window is dominated by a single
+   * breath. The pacing rule skips such segments, AND baseline.ts drops them
+   * from the stddev population. seg-006's end-blurt (313 WPM over 2.3s rough /
+   * 218 WPM over 3.3s clean) must not fire pacing in either take.
+   */
+  minPaceVerdictSec: 4,
   /** Fillers in one segment beyond this count escalate low -> medium. */
   fillerDensityPerSegment: 2,
   /** A marked pause honoured at less than this fraction of median is skipped. */
