@@ -10,7 +10,6 @@
  */
 
 import type {
-  Baseline,
   CorrelationResult,
   DeliveryReport,
   DeliverySignal,
@@ -23,6 +22,7 @@ import type {
 } from '@nsh/contracts';
 
 export * from './align.js';
+export * from './baseline.js';
 export * from './errors.js';
 export * from './next-step.js';
 export * from './parse-script.js';
@@ -57,9 +57,4 @@ export function generateSummary(
   _meta: { reportId: string; audioUrl: string | null },
 ): DeliveryReport {
   throw new Error(`generateSummary: ${PENDING}`);
-}
-
-/** Speaker's own norms from this recording. Never a population average. */
-export function computeBaseline(_alignments: SegmentAlignment[]): Baseline {
-  throw new Error(`computeBaseline: ${PENDING}`);
 }

@@ -208,6 +208,12 @@ export const Baseline = z.object({
   paceStdDev: z.number(),
   meanRms: z.number(),
   medianF0: z.number().nullable(),
+  /**
+   * Median of all inter-word gaps exceeding THRESHOLDS.pauseMinSec. Inter-word
+   * rather than inter-segment: six segments give too few samples for a stable
+   * median. Null when the speaker never paused.
+   */
+  medianPauseSec: z.number().nullable(),
 });
 export type Baseline = z.infer<typeof Baseline>;
 
