@@ -103,8 +103,11 @@ This makes filler classification depend on alignment, which resolves cleanly
 because the two classes enter alignment differently (§6).
 
 `fillerMatchLength(tokens, i)` returns 2, 1 or 0, testing multi-word entries as
-bigrams before single tokens. `tagFillers(words)` applies the hard-filler pass
-and is exported for P2's STT adapter, so both sides classify identically.
+bigrams before single tokens. `tagHardFillers(words)` applies the hard-filler pass
+and is exported for P2's STT adapter, so both sides classify identically. (The
+function is named `tagHardFillers`, not `tagFillers`: it only tags the hard
+lexicon — soft fillers are resolved after alignment in §6, so a single "tag all
+fillers" entry point would be misleading.)
 
 ## 5. `parseScript(raw): ScriptSegment[]`
 
@@ -122,7 +125,12 @@ string. It is never interpreted as a mid-segment pause.
 Errors: `SCRIPT_EMPTY` when `raw.trim()` is empty; `SCRIPT_NO_SEGMENTS` when
 every block is empty after stripping markup.
 
-## 6. `alignSegments(transcript, segments): SegmentAlignment[]`
+## 6. `alignSegments(transcript, segments): AlignmentResult`
+
+The return is `AlignmentResult` (`{ alignments: SegmentAlignment[]; words: Word[];
+matchRate: number }`), not a bare `SegmentAlignment[]`: soft-filler resolution
+finalises `Word.isFiller`, so the caller needs the updated `words`. `AlignmentResult`
+is a Tier-2 addition to `@nsh/contracts`.
 
 ### Algorithm
 
@@ -183,7 +191,7 @@ A fallback that fabricates a passing grade is worse than a visible failure.
 Degradation is carried on `SegmentAlignment` via a `degraded: boolean` field —
 a Tier-2 addition, no sign-off needed (CONVENTIONS §2).
 
-## 7. `computeBaseline(alignments): Baseline`
+## 7. `computeBaseline(alignments, words, prosody): Baseline`
 
 The speaker's own norms, from this recording only.
 
@@ -235,8 +243,16 @@ keeps "exactly one high-severity issue" reachable.
 **Stress suppresses pacing on the same segment.** Both read the same WPM
 observation; emitting both double-reports one fact and dilutes the red tick.
 
-**One issue per filler word**, attributed by timestamp, severity from the three
-filler rules in table order.
+**One issue per consecutive filler *run*** (not per word), attributed by the run's
+start timestamp, severity from the three filler rules in table order.
+
+> **Deviation from the original "one issue per filler word" (deliberate, per the
+> plan).** "you know" is two words but a single hedge, and "um um" is one stumble;
+> emitting one tick per word would both inflate `fillerCount` and place
+> overlapping, unclickably-close ticks on the timeline. Consecutive filler words
+> therefore collapse into one issue whose `runWordCount` records how many words it
+> spanned. The soft-filler tagger (§6) marks *every* constituent word of a bigram
+> as filler so the run groups correctly.
 
 **Degraded segments** emit neither `pacing` nor `stress_mismatch`.
 

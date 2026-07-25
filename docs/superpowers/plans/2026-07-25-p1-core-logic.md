@@ -6,7 +6,7 @@
 
 **Architecture:** Pure TypeScript library, zero NitroStack imports, zero network, zero clock reads. Needleman-Wunsch aligns script tokens to transcript tokens; severity verdicts come from a data table, not scattered conditionals; every verdict carries a `DecisionTrace` for Ops Canvas.
 
-**Tech Stack:** TypeScript 5.6 (strict, `noUncheckedIndexedAccess`), Vitest 2.1, Zod 3 (via `@nsh/contracts`), `pitchfinder` (Task 11 only), Node 24.
+**Tech Stack:** TypeScript 5.6 (strict, `noUncheckedIndexedAccess`), Vitest 2.1, Zod 3 (via `@nsh/contracts`), `pitchfinder` (Task 11 only), Node `>=20` (matches the root `package.json` engines field; do not assume Node 24).
 
 ## Global Constraints
 
@@ -17,7 +17,7 @@
 - Never throw raw `Error` across a boundary — always `CoachError` with a code.
 - Import types from `@nsh/contracts`; never redeclare them.
 - WPM **excludes fillers** and **divides by voiced time**, not wall-clock.
-- Commit after every task. Branch `p1/core-logic`.
+- Commit after every task. Branch `p1/core-logic` is created by the controller before Task 1; implementers commit to it.
 
 **Spec:** [`docs/superpowers/specs/2026-07-25-p1-core-logic-design.md`](../specs/2026-07-25-p1-core-logic-design.md)
 
@@ -44,13 +44,14 @@
 ### Task 1: Tokenizer and threshold table
 
 **Files:**
+- Modify: `packages/core-logic/src/errors.ts` (add the `INTERNAL` code)
 - Create: `packages/core-logic/src/thresholds.ts`
 - Create: `packages/core-logic/src/tokenize.ts`
 - Create: `packages/core-logic/src/tokenize.test.ts`
-- Modify: `packages/core-logic/src/index.ts` (remove `THRESHOLDS`/`SEVERITY_RULES`, re-export instead)
+- Modify: `packages/core-logic/src/index.ts` (ensure `errors`/`thresholds`/`tokenize` re-exports; leave the function stubs)
 
 **Interfaces:**
-- Consumes: `FILLER_LEXICON`, `Severity`, `Word` from `@nsh/contracts`
+- Consumes: `FILLER_LEXICON`, `Severity`, `Word` from `@nsh/contracts`; `CoachError` from `./errors.js`
 - Produces: `normaliseText(text: string): string[]`, `fillerMatchLength(tokens: string[], i: number): 0|1|2`, `isHardFiller(token: string): boolean`, `isSoftFiller(tokens: string[], i: number): 0|1|2`, `tagHardFillers(words: Word[]): Word[]`, `THRESHOLDS`, `SEVERITY_RULES`
 
 - [ ] **Step 1: Write the failing test**
@@ -130,11 +131,30 @@ describe('tagHardFillers', () => {
 Run: `npm test -w packages/core-logic`
 Expected: FAIL — `Cannot find module './tokenize.js'`
 
-- [ ] **Step 3: Create the threshold table**
+- [ ] **Step 3: Add the `INTERNAL` error code, then create the threshold table**
+
+First extend the `CoachErrorCode` union in `packages/core-logic/src/errors.ts` so that
+internal invariant violations (a rule id that is not in the table, etc.) never
+cross a boundary as a raw `Error` — Global Constraint #5. Add `| 'INTERNAL'`:
+
+```ts
+// packages/core-logic/src/errors.ts — add to the CoachErrorCode union
+export type CoachErrorCode =
+  | 'SCRIPT_EMPTY'
+  | 'SCRIPT_NO_SEGMENTS'
+  | 'AUDIO_UNREADABLE'
+  | 'AUDIO_TOO_SHORT'
+  | 'STT_FAILED'
+  | 'ALIGNMENT_FAILED'
+  | 'INTERNAL';
+```
+
+Then create the threshold table:
 
 ```ts
 // packages/core-logic/src/thresholds.ts
 import type { Severity } from '@nsh/contracts';
+import { CoachError } from './errors.js';
 
 /** Tuned against the locked demo recordings. Task 12 revisits these. */
 export const THRESHOLDS = {
@@ -219,7 +239,10 @@ export const SEVERITY_RULES: ReadonlyArray<{
 
 export function ruleById(id: string) {
   const rule = SEVERITY_RULES.find((r) => r.id === id);
-  if (!rule) throw new Error(`unknown severity rule: ${id}`);
+  // An unknown rule id is a programming error, not a user-facing one, but it
+  // still must not surface as a raw Error across the tool boundary (Global
+  // Constraint #5). Throw a typed CoachError with the INTERNAL code.
+  if (!rule) throw new CoachError('INTERNAL', `unknown severity rule: ${id}`);
   return rule;
 }
 ```
@@ -294,7 +317,9 @@ export function tagHardFillers(words: Word[]): Word[] {
 
 - [ ] **Step 5: Re-export from index.ts**
 
-Replace the `THRESHOLDS` and `SEVERITY_RULES` declarations in `packages/core-logic/src/index.ts` with:
+Ensure `packages/core-logic/src/index.ts` re-exports the modules this task creates
+(these three lines already exist in the scaffold; confirm they are present, in the
+re-export block above the stubs):
 
 ```ts
 export * from './errors.js';
@@ -302,7 +327,17 @@ export * from './thresholds.js';
 export * from './tokenize.js';
 ```
 
-Keep the seven function stubs in place for now; later tasks replace them one at a time.
+**The stub scheme (read once, applied by every task):** `index.ts` ships with
+seven throwing function stubs — `parseScript`, `extractProsody`, `alignSegments`,
+`correlateSegments`, `generateSummary`, `decideNextStep`, `computeBaseline`. A
+stub exists **only** for a function that is not yet implemented. The task that
+implements function X **deletes X's stub** and adds `export * from './<module>.js'`
+in the same step (see each task's dedicated "Replace the X stub" step). After
+Task 1 all seven stubs still stand (Task 1 implements no `CoreLogic` function);
+by the end of Task 11 every stub is gone and `index.ts` is pure re-exports,
+matching the File Structure table row. Never leave a stub and a real
+`export * from './<module>.js'` for the same function in `index.ts` at once — the
+duplicate `export function` / re-export would collide.
 
 - [ ] **Step 6: Run tests and typecheck**
 
@@ -312,7 +347,7 @@ Expected: PASS — 12 tests green, no type errors
 - [ ] **Step 7: Commit**
 
 ```bash
-git add packages/core-logic/src/thresholds.ts packages/core-logic/src/tokenize.ts packages/core-logic/src/tokenize.test.ts packages/core-logic/src/index.ts
+git add packages/core-logic/src/errors.ts packages/core-logic/src/thresholds.ts packages/core-logic/src/tokenize.ts packages/core-logic/src/tokenize.test.ts packages/core-logic/src/index.ts
 git commit -m "feat(core-logic): tokenizer with hard/soft filler split
 
 Soft fillers (like, right, actually) can be legitimate script words —
@@ -492,6 +527,22 @@ so a shared .test() would be stateful via lastIndex."
 - Produces: two frozen `Transcript` JSON files, provider `"deepgram"`
 
 **Prerequisite:** the two recordings exist. Tasks 1–2 do not need them; Task 5 onward does.
+
+> **Note — Task 3 is hard-blocked on real audio, and has no synthetic fallback by design.**
+> `fixtures/audio/` currently holds only `.gitkeep`. If the recordings are absent
+> when Task 3 begins, the controller **defers Task 3** and proceeds to **Task 4**
+> (Needleman-Wunsch, synthetic-test only — it needs no audio). Do **not** invent
+> a synthetic transcript to stand in for the golden path: the whole point of this
+> pipeline is measuring a *real* delivery against the script, so a hand-authored
+> transcript would make the golden test circular (it would assert the code
+> reproduces numbers the author chose, not numbers the audio produced).
+> `STT_PROVIDER=fixture` (CONVENTIONS §9) is a **server-runtime** fallback that
+> *replays* an already-frozen transcript when the venue wifi dies — it is not a
+> fixture-*generation* path and cannot substitute for this task.
+> `scripts/transcribe.mjs` reads `DEEPGRAM_API_KEY` from `.env` (via
+> `--env-file=.env`) and **must never print, log, or echo the key's value** — only
+> whether it is set. Tasks 5–12 that consume the fixtures stay blocked until
+> Task 3 has actually run against real audio.
 
 - [ ] **Step 1: Write the dev script**
 
@@ -796,19 +847,25 @@ noUncheckedIndexedAccess noise on hot cell reads."
 **Files:**
 - Modify: `packages/core-logic/src/align.ts`
 - Modify: `packages/core-logic/src/align.test.ts`
+- Modify: `packages/core-logic/src/index.ts` (replace the `alignSegments` stub with a re-export)
 - Modify: `packages/contracts/src/index.ts` (Tier-2 additions)
 
 **Interfaces:**
-- Consumes: `needlemanWunsch` (Task 4); `normaliseText`, `isHardFiller`, `isSoftFiller` (Task 1); `parseScript` (Task 2); `Transcript`, `ScriptSegment`, `SegmentAlignment`, `Word` from `@nsh/contracts`
-- Produces: `interface AlignmentResult { alignments: SegmentAlignment[]; words: Word[]; matchRate: number }`; `alignSegments(transcript: Transcript, segments: ScriptSegment[]): AlignmentResult`
+- Consumes: `needlemanWunsch` (Task 4); `normaliseText`, `isHardFiller`, `isSoftFiller` (Task 1); `parseScript` (Task 2); `Transcript`, `ScriptSegment`, `SegmentAlignment`, `Word`, `AlignmentResult` from `@nsh/contracts`
+- Produces: `alignSegments(transcript: Transcript, segments: ScriptSegment[]): AlignmentResult` (the `AlignmentResult` type is defined in contracts by this task and re-exported from `./align.js`)
 
-**Tier-2 contract changes** (internal seam, heads-up to P2, no sign-off — CONVENTIONS §2):
-1. `SegmentAlignment` gains `degraded: boolean`.
-2. `alignSegments` returns `AlignmentResult` rather than `SegmentAlignment[]`, because soft-filler resolution finalises `Word.isFiller` and the caller needs those updated words.
+**Heads-up P2:** this task makes three Tier-2 changes to `packages/contracts/src/index.ts`
+(internal P1↔P2 seam, heads-up in chat, no sign-off — CONVENTIONS §2): (1)
+`SegmentAlignment` gains `degraded: boolean`; (2) a new `AlignmentResult` type
+(`{ alignments, words, matchRate }`) is added because soft-filler resolution
+finalises `Word.isFiller` and the caller needs the updated `words`; (3)
+`CoreLogic.alignSegments` now returns `AlignmentResult` and
+`CoreLogic.correlateSegments` now takes `alignment: AlignmentResult` instead of
+`alignments: SegmentAlignment[]`.
 
 - [ ] **Step 1: Apply the Tier-2 contract changes**
 
-In `packages/contracts/src/index.ts`, add to the `SegmentAlignment` object, after `precedingPauseSec`:
+**(a)** In `packages/contracts/src/index.ts`, add to the `SegmentAlignment` object, after `precedingPauseSec`:
 
 ```ts
   /**
@@ -821,17 +878,42 @@ In `packages/contracts/src/index.ts`, add to the `SegmentAlignment` object, afte
   degraded: z.boolean(),
 ```
 
-And change the `CoreLogic.alignSegments` signature:
+**(b)** Immediately **after** the `SegmentAlignment` schema/type (it references
+`SegmentAlignment` and `Word`, both already defined above it), add the
+`AlignmentResult` type:
+
+```ts
+/**
+ * Return of alignSegments. `words` carries `isFiller` finalised after
+ * soft-filler resolution, so the caller gets the updated words rather than a
+ * bare SegmentAlignment[]. Tier-2 (P1<->P2 seam), never shipped to the widget.
+ */
+export const AlignmentResult = z.object({
+  alignments: z.array(SegmentAlignment),
+  words: z.array(Word),
+  /** Matched script tokens / total script tokens. Below 0.4 alignSegments throws. */
+  matchRate: z.number(),
+});
+export type AlignmentResult = z.infer<typeof AlignmentResult>;
+```
+
+**(c)** Change the `CoreLogic.alignSegments` return type to `AlignmentResult`:
 
 ```ts
   /** tool 3a: map each script segment onto its region of the recording. */
-  alignSegments(transcript: Transcript, segments: ScriptSegment[]): {
-    alignments: SegmentAlignment[];
-    /** transcript.words with isFiller finalised after soft-filler resolution. */
-    words: Word[];
-    /** Matched script tokens / total script tokens. Below 0.4 we throw. */
-    matchRate: number;
-  };
+  alignSegments(transcript: Transcript, segments: ScriptSegment[]): AlignmentResult;
+```
+
+**(d)** Change the `CoreLogic.correlateSegments` third parameter from
+`alignments: SegmentAlignment[]` to `alignment: AlignmentResult`:
+
+```ts
+  /** tool 3b: THE BRANCH. Cross-reference script intent against delivery signal. */
+  correlateSegments(
+    signal: DeliverySignal,
+    segments: ScriptSegment[],
+    alignment: AlignmentResult,
+  ): CorrelationResult;
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -847,6 +929,9 @@ import { parseScript } from './parse-script.js';
 const fixtures = join(import.meta.dirname, '../../contracts/fixtures');
 const demoScript = readFileSync(join(fixtures, 'script.demo.md'), 'utf8');
 const rough = JSON.parse(readFileSync(join(fixtures, 'transcript.rough.json'), 'utf8'));
+
+/** Same 1-decimal rounding the implementation uses, so wpm can be asserted exactly. */
+const r1 = (n: number) => Math.round(n * 10) / 10;
 
 describe('alignSegments', () => {
   const segments = parseScript(demoScript);
@@ -876,7 +961,7 @@ describe('alignSegments', () => {
   });
 
   it('degrades no segment on a good take', () => {
-    expect(result.alignments.every((a) => !a.degraded)).toBe(false || true);
+    expect(result.alignments.every((a) => !a.degraded)).toBe(true);
     expect(result.alignments.filter((a) => a.degraded)).toHaveLength(0);
   });
 
@@ -905,10 +990,13 @@ describe('alignSegments', () => {
   });
 
   it('excludes fillers from wpm', () => {
+    // Derive the expected value from the PUBLIC outputs rather than a hand-guess:
+    // count the non-filler words the alignment attributed to seg-002, and use the
+    // segment's own rounded startSec/endSec. The implementation computes wpm from
+    // those same rounded fields, so the equality is exact, not approximate.
     const seg2 = result.alignments.find((a) => a.segmentId === 'seg-002')!;
-    const contentWords = 15;
-    const expected = (contentWords / (seg2.endSec - seg2.startSec)) * 60;
-    expect(seg2.wpm).toBeCloseTo(Math.round(expected * 10) / 10, 0);
+    const n = result.words.slice(seg2.wordIdxStart, seg2.wordIdxEnd).filter((w) => !w.isFiller).length;
+    expect(seg2.wpm).toBe(r1((n / (seg2.endSec - seg2.startSec)) * 60));
   });
 
   it('throws ALIGNMENT_FAILED when the audio is not this script', () => {
@@ -933,18 +1021,15 @@ Expected: FAIL — `alignSegments is not a function`
 
 ```ts
 // append to packages/core-logic/src/align.ts
-import type { ScriptSegment, SegmentAlignment, Transcript, Word } from '@nsh/contracts';
+import type { AlignmentResult, ScriptSegment, SegmentAlignment, Transcript } from '@nsh/contracts';
 import { CoachError } from './errors.js';
 import { THRESHOLDS } from './thresholds.js';
 import { isHardFiller, isSoftFiller, normaliseText } from './tokenize.js';
 
-export interface AlignmentResult {
-  alignments: SegmentAlignment[];
-  /** transcript.words with isFiller finalised after soft-filler resolution. */
-  words: Word[];
-  /** Matched script tokens / total script tokens. */
-  matchRate: number;
-}
+// AlignmentResult now lives in @nsh/contracts (Tier-2, added in Step 1). Re-export
+// it here so consumers that import it from './align.js' (Task 7's correlate.ts)
+// keep resolving against a single source of truth.
+export type { AlignmentResult } from '@nsh/contracts';
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -992,11 +1077,19 @@ export function alignSegments(
   }
 
   // --- resolve soft fillers: in the lexicon AND unmatched by any script token ---
+  // A soft-filler bigram ("you know") is ONE hedge spanning TWO words. Tag every
+  // constituent word, not just the matched index — otherwise "know" stays a
+  // content word, inflating that segment's WPM and contradicting the "two words,
+  // one hedge" rationale the filler rules depend on (Task 9).
   for (const pair of pairs) {
     if (pair.op !== 'gapScript' || pair.transcriptIdx === null) continue;
     const wordIdx = alignToWordIdx[pair.transcriptIdx];
     if (wordIdx === undefined) continue;
-    if (isSoftFiller(normalised, wordIdx) > 0) words[wordIdx]!.isFiller = true;
+    const matchLen = isSoftFiller(normalised, wordIdx);
+    for (let k = 0; k < matchLen; k++) {
+      const w = words[wordIdx + k];
+      if (w) w.isFiller = true;
+    }
   }
 
   // --- per-segment spans from first and last matched token ---
@@ -1013,7 +1106,7 @@ export function alignSegments(
   }
 
   const alignments: SegmentAlignment[] = [];
-  let prevEnd = 0;
+  let prevEnd = 0; // the PREVIOUS segment's rounded endSec
 
   segments.forEach((seg, segIdx) => {
     const span = spans[segIdx]!;
@@ -1035,21 +1128,30 @@ export function alignSegments(
 
     const startWord = words[wordIdxStart];
     const endWord = words[Math.max(wordIdxEnd - 1, wordIdxStart)];
-    const startSec = startWord?.start ?? prevEnd;
-    const endSec = Math.max(endWord?.end ?? startSec + 0.1, startSec + 0.1);
+    const rawStart = startWord?.start ?? prevEnd;
+    const rawEnd = Math.max(endWord?.end ?? rawStart + 0.1, rawStart + 0.1);
+
+    // Round FIRST, then derive every downstream number from the stored rounded
+    // fields. r1(a) - r1(b) is not r1(a - b), so computing precedingPauseSec and
+    // wpm from the unrounded values would break invariants asserted on the public
+    // startSec/endSec fields. Deriving from the rounded fields makes both
+    // "precedingPauseSec == startSec - previous endSec" and the wpm formula hold
+    // exactly against those fields (Findings 2 & 4).
+    const startSec = r1(rawStart);
+    const endSec = r1(rawEnd);
+    const duration = endSec - startSec;
 
     const inRange = words.slice(wordIdxStart, wordIdxEnd);
     const contentWords = inRange.filter((w) => !w.isFiller).length;
     const fillerCount = inRange.filter((w) => w.isFiller).length;
-    const durationSec = endSec - startSec;
 
     alignments.push({
       segmentId: seg.id,
-      startSec: r1(startSec),
-      endSec: r1(endSec),
+      startSec,
+      endSec,
       wordIdxStart,
       wordIdxEnd,
-      wpm: r1(durationSec > 0 ? (contentWords / durationSec) * 60 : 0),
+      wpm: r1(duration > 0 ? (contentWords / duration) * 60 : 0),
       fillerCount,
       meanRms: 0, // filled by Task 11; zero-frame prosody is valid
       meanF0: null,
@@ -1057,28 +1159,53 @@ export function alignSegments(
       degraded,
     });
 
-    prevEnd = endSec;
+    prevEnd = endSec; // rounded, so the next segment's precedingPauseSec is exact
   });
 
   return { alignments, words, matchRate };
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Replace the `alignSegments` stub in `index.ts`**
+
+Delete the `alignSegments` stub from `packages/core-logic/src/index.ts`:
+
+```ts
+/** tool 3a: map each script segment onto its region of the recording. */
+export function alignSegments(
+  _transcript: Transcript,
+  _segments: ScriptSegment[],
+): SegmentAlignment[] {
+  throw new Error(`alignSegments: ${PENDING}`);
+}
+```
+
+and add the module re-export (this pulls in both `needlemanWunsch` from Task 4 and
+`alignSegments` from this task, plus the re-exported `AlignmentResult` type):
+
+```ts
+export * from './align.js';
+```
+
+Once the stub is gone, the now-unused `SegmentAlignment` / `Transcript` type
+imports at the top of `index.ts` may need trimming if `noUnusedLocals` complains —
+remove only the ones no surviving stub still references.
+
+- [ ] **Step 6: Run tests to verify they pass**
 
 Run: `npm test -w packages/core-logic -- align`
 Expected: PASS — 22 tests green
 
 If `seg-003` is not the fastest segment, the rough take did not rush the key stat enough. Re-record rather than lowering the threshold — the demo depends on this being real.
 
-- [ ] **Step 6: Wire prosody means into the alignment**
+- [ ] **Step 7: Wire prosody means into the alignment**
 
 Prosody is still all zeros at this point. Task 11 revisits `meanRms`/`meanF0`. Leave them as written.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add packages/core-logic/src/align.ts packages/core-logic/src/align.test.ts packages/contracts/src/index.ts
+git add packages/core-logic/src/align.ts packages/core-logic/src/align.test.ts packages/core-logic/src/index.ts packages/contracts/src/index.ts
 git commit -m "feat(core-logic): alignSegments over Needleman-Wunsch
 
 Hard fillers leave the aligner input; soft fillers stay in so that an
@@ -1097,11 +1224,18 @@ AlignmentResult. Heads-up to P2."
 **Files:**
 - Create: `packages/core-logic/src/baseline.ts`
 - Create: `packages/core-logic/src/baseline.test.ts`
+- Modify: `packages/core-logic/src/index.ts` (replace the `computeBaseline` stub with a re-export)
 - Modify: `packages/contracts/src/index.ts` (Tier-2: `Baseline.medianPauseSec`)
 
 **Interfaces:**
-- Consumes: `AlignmentResult` (Task 5); `Baseline`, `ProsodyTrack`, `Word` from `@nsh/contracts`
+- Consumes: `AlignmentResult` (Task 5); `Baseline`, `ProsodyTrack`, `SegmentAlignment`, `Word` from `@nsh/contracts`
 - Produces: `computeBaseline(alignments: SegmentAlignment[], words: Word[], prosody: ProsodyTrack): Baseline`
+
+**Heads-up P2:** this task adds one Tier-2 field to `packages/contracts/src/index.ts` —
+`Baseline.medianPauseSec: number | null` (median of inter-word gaps over
+`THRESHOLDS.pauseMinSec`), consumed by the pause rule. Internal P1↔P2 seam,
+heads-up in chat, no sign-off (CONVENTIONS §2). `computeBaseline` itself is not a
+`CoreLogic` interface method, so no interface signature changes.
 
 - [ ] **Step 1: Add the Tier-2 field**
 
@@ -1247,15 +1381,34 @@ export function computeBaseline(
 }
 ```
 
-- [ ] **Step 5: Run tests and typecheck**
+- [ ] **Step 5: Replace the `computeBaseline` stub in `index.ts`**
+
+Delete the `computeBaseline` stub from `packages/core-logic/src/index.ts` (note the
+stub's 1-arg signature is wrong — the real function takes three arguments, which
+is exactly why the stub must go):
+
+```ts
+/** Speaker's own norms from this recording. Never a population average. */
+export function computeBaseline(_alignments: SegmentAlignment[]): Baseline {
+  throw new Error(`computeBaseline: ${PENDING}`);
+}
+```
+
+and add the module re-export:
+
+```ts
+export * from './baseline.js';
+```
+
+- [ ] **Step 6: Run tests and typecheck**
 
 Run: `npm test -w packages/core-logic && npm run typecheck --workspaces`
 Expected: PASS — all green
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add packages/core-logic/src/baseline.ts packages/core-logic/src/baseline.test.ts packages/contracts/src/index.ts
+git add packages/core-logic/src/baseline.ts packages/core-logic/src/baseline.test.ts packages/core-logic/src/index.ts packages/contracts/src/index.ts
 git commit -m "feat(core-logic): computeBaseline from the speaker's own recording
 
 Pace divides by voiced time, not wall-clock, so a deliberate pause is
@@ -1391,22 +1544,61 @@ import { ruleById, THRESHOLDS } from './thresholds.js';
 
 /** An issue before it has been sorted and given an id. */
 export type RawIssue = Omit<DeliveryIssue, 'id'>;
+/** A trace before its issue has an id. */
+export type RawTrace = Omit<DecisionTrace, 'issueId'>;
+/**
+ * An issue and the trace that justifies it, carried together so the two can be
+ * sorted and numbered as a unit. Positional pairing — never a string key — is
+ * how the trace stays attached to its issue: two same-type issues in one segment
+ * at the same rounded timestamp would collide on any `segmentId|type|timestamp`
+ * key, silently attaching one issue's trace to the other (Finding 13).
+ */
+interface IssuePair { issue: RawIssue; trace: RawTrace }
 
 const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
+ * The one deterministic ordering, shared by `sortAndNumberIssues` and the paired
+ * numbering below so the two can never drift. Ties break by severity then type;
+ * if IDs shuffled between runs the rehearsed demo click-path would break on stage
+ * (CONVENTIONS §3).
+ */
+function compareIssues(a: RawIssue, b: RawIssue): number {
+  return (
+    a.timestamp - b.timestamp ||
+    SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
+    a.type.localeCompare(b.type)
+  );
+}
+
+/**
  * IDs are assigned AFTER sorting so the same input always produces the same
- * report byte for byte. Ties break deterministically — if IDs shuffled between
- * runs, the rehearsed demo click-path would break on stage (CONVENTIONS §3).
+ * report byte for byte. Standalone helper (exported for its own unit test);
+ * `correlateSegments` uses `numberIssuePairs` so it can carry traces alongside.
  */
 export function sortAndNumberIssues(raw: RawIssue[]): DeliveryIssue[] {
   return [...raw]
-    .sort((a, b) =>
-      a.timestamp - b.timestamp ||
-      SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
-      a.type.localeCompare(b.type))
+    .sort(compareIssues)
     .map((issue, idx) => ({ id: `iss-${String(idx + 1).padStart(3, '0')}`, ...issue }));
+}
+
+/**
+ * Sort issue/trace PAIRS together by the same ordering, then assign `iss-NNN`
+ * ids positionally and stamp each trace's `issueId`. Because the trace travels
+ * with its issue through the sort, the id/issueId correspondence is exact with
+ * no key lookup that could collide.
+ */
+function numberIssuePairs(pairs: IssuePair[]): { issues: DeliveryIssue[]; trace: DecisionTrace[] } {
+  const sorted = [...pairs].sort((x, y) => compareIssues(x.issue, y.issue));
+  const issues: DeliveryIssue[] = [];
+  const trace: DecisionTrace[] = [];
+  sorted.forEach((pair, idx) => {
+    const id = `iss-${String(idx + 1).padStart(3, '0')}`;
+    issues.push({ id, ...pair.issue });
+    trace.push({ issueId: id, ...pair.trace });
+  });
+  return { issues, trace };
 }
 
 /** Mean f0 over the first and last third of a segment, for the pitch-rise rule. */
@@ -1428,6 +1620,10 @@ function pitchSlope(signal: DeliverySignal, a: SegmentAlignment): number | null 
  * cross-referencing WHERE it happened against WHAT the script says should
  * happen there. Every verdict emits a DecisionTrace — that trace is what a
  * judge reads on Ops Canvas, so it is not optional polish.
+ *
+ * Task 7 emits only the stress rule; Task 9 makes this a superset with filler,
+ * pause and pacing. The pair-collection + numberIssuePairs shape is already in
+ * place so Task 9 only adds `pairs.push(...)` blocks.
  */
 export function correlateSegments(
   signal: DeliverySignal,
@@ -1435,8 +1631,7 @@ export function correlateSegments(
   alignment: AlignmentResult,
 ): CorrelationResult {
   const baseline = computeBaseline(alignment.alignments, alignment.words, signal.prosody);
-  const raw: RawIssue[] = [];
-  const pending: Array<{ key: string; rule: string; trace: Omit<DecisionTrace, 'issueId'> }> = [];
+  const pairs: IssuePair[] = [];
 
   const byId = new Map(alignment.alignments.map((a) => [a.segmentId, a]));
   const rushCeiling = baseline.avgPaceWpm + THRESHOLDS.paceDriftSigma * baseline.paceStdDev;
@@ -1464,17 +1659,14 @@ export function correlateSegments(
       : `Pitch rises ${Math.round(((slope ?? 1) - 1) * 100)}% across this line. ` +
         'It is a key point stated as fact, but delivered as a question.';
 
-    raw.push({
-      type: 'stress_mismatch',
-      severity: rule.verdict,
-      timestamp: a.startSec,
-      segmentId: segment.id,
-      detail,
-    });
-
-    pending.push({
-      key: `${segment.id}|stress_mismatch|${a.startSec}`,
-      rule: ruleId,
+    pairs.push({
+      issue: {
+        type: 'stress_mismatch',
+        severity: rule.verdict,
+        timestamp: a.startSec,
+        segmentId: segment.id,
+        detail,
+      },
       trace: {
         segmentId: segment.id,
         rule: ruleId,
@@ -1491,15 +1683,7 @@ export function correlateSegments(
     });
   }
 
-  const issues = sortAndNumberIssues(raw);
-  const trace: DecisionTrace[] = issues.map((issue) => {
-    const match = pending.find(
-      (p) => p.key === `${issue.segmentId}|${issue.type}|${issue.timestamp}`,
-    );
-    if (!match) throw new Error(`no trace for issue ${issue.id}`);
-    return { issueId: issue.id, ...match.trace };
-  });
-
+  const { issues, trace } = numberIssuePairs(pairs);
   return { issues, trace, baseline };
 }
 ```
@@ -1511,7 +1695,28 @@ Expected: PASS — 11 tests green
 
 If "exactly one high-severity issue" fails because `seg-005` also fired, that is the tuning signal. Raise `paceDriftSigma` toward 2.0 in `thresholds.ts` until only `seg-003` fires. Do not edit the test.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Replace the `correlateSegments` stub in `index.ts`**
+
+Delete the `correlateSegments` stub from `packages/core-logic/src/index.ts`:
+
+```ts
+/** tool 3b: THE BRANCH. Cross-references script intent against delivery signal. */
+export function correlateSegments(
+  _signal: DeliverySignal,
+  _segments: ScriptSegment[],
+  _alignments: SegmentAlignment[],
+): CorrelationResult {
+  throw new Error(`correlateSegments: ${PENDING}`);
+}
+```
+
+and add the module re-export:
+
+```ts
+export * from './correlate.js';
+```
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add packages/core-logic/src/correlate.ts packages/core-logic/src/correlate.test.ts packages/core-logic/src/index.ts
@@ -1530,12 +1735,19 @@ for Ops Canvas."
 **Files:**
 - Create: `packages/core-logic/src/summary.ts`
 - Create: `packages/core-logic/src/summary.test.ts`
+- Modify: `packages/core-logic/src/index.ts` (replace the `generateSummary` stub with a re-export)
 
 **Interfaces:**
 - Consumes: `CorrelationResult`, `DeliveryReport`, `DeliverySignal`, `ScriptSegment`, `CONTRACT_VERSION` from `@nsh/contracts`
 - Produces: `generateSummary(segments, correlation, signal, meta: { reportId: string; audioUrl: string | null }): DeliveryReport`
 
 After this task the widget has a real `DeliveryReport` to render.
+
+Note on issue/trace pairing: `correlateSegments` (Task 7) already sorts, numbers
+(`iss-NNN`), and stamps `trace.issueId` via positional pairing, and
+`DeliveryReport` does not carry the trace. So `generateSummary` **passes
+`correlation.issues` straight through** — it must not re-sort or re-number them,
+and there is no `segmentId|type|timestamp` lookup to perform here.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1580,8 +1792,10 @@ describe('generateSummary', () => {
     expect(report.fillerCount).toBe(report.issues.filter((i) => i.type === 'filler').length);
   });
 
-  it('takes duration from the transcript', () => {
-    expect(report.durationSec).toBe(rough.durationSec);
+  it('takes duration from the transcript, rounded to one decimal', () => {
+    // generateSummary rounds durationSec to 1dp (all emitted floats are r1);
+    // the transcript fixture stores 3dp, so assert the rounded value, not raw.
+    expect(report.durationSec).toBe(Math.round(rough.durationSec * 10) / 10);
   });
 
   it('leaves nextStep null for the caller to fill', () => {
@@ -1648,7 +1862,29 @@ export function generateSummary(
 Run: `npm test -w packages/core-logic -- summary`
 Expected: PASS — 8 tests green
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Replace the `generateSummary` stub in `index.ts`**
+
+Delete the `generateSummary` stub from `packages/core-logic/src/index.ts`:
+
+```ts
+/** tool 4: generate_summary */
+export function generateSummary(
+  _segments: ScriptSegment[],
+  _correlation: CorrelationResult,
+  _signal: DeliverySignal,
+  _meta: { reportId: string; audioUrl: string | null },
+): DeliveryReport {
+  throw new Error(`generateSummary: ${PENDING}`);
+}
+```
+
+and add the module re-export:
+
+```ts
+export * from './summary.js';
+```
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add packages/core-logic/src/summary.ts packages/core-logic/src/summary.test.ts packages/core-logic/src/index.ts
@@ -1777,24 +2013,81 @@ function fillerRuns(words: Word[], from: number, to: number): FillerRun[] {
 }
 ```
 
-- [ ] **Step 4: Add the three rule blocks inside the segment loop**
+- [ ] **Step 4: Replace `correlateSegments` with its complete final form**
 
-In `correlateSegments`, replace the two early `continue` guards with this structure. The stress block from Task 7 stays exactly as written, but is now wrapped so the other rules still run:
+Replace the whole `correlateSegments` body from Task 7 with the version below.
+It is a **superset** of Task 7's function — same imports, same helpers
+(`pitchSlope`, `numberIssuePairs`, `ruleById`, `r1`), same `IssuePair`
+pair-collection shape — that adds the filler, pause and pacing rules. The stress
+block is byte-identical to Task 7's except it now sets `hasStressIssue = true` on
+emit so pacing can be suppressed on the same segment. `fillerRuns` (Step 3) and
+the `Word` import are the only genuinely new symbols.
 
 ```ts
+export function correlateSegments(
+  signal: DeliverySignal,
+  segments: ScriptSegment[],
+  alignment: AlignmentResult,
+): CorrelationResult {
+  const baseline = computeBaseline(alignment.alignments, alignment.words, signal.prosody);
+  const pairs: IssuePair[] = [];
+
+  const byId = new Map(alignment.alignments.map((a) => [a.segmentId, a]));
+  const rushCeiling = baseline.avgPaceWpm + THRESHOLDS.paceDriftSigma * baseline.paceStdDev;
+
   for (const segment of segments) {
     const a = byId.get(segment.id);
     if (!a) continue;
 
     let hasStressIssue = false;
 
-    // ---- stress_mismatch (Task 7 body, unchanged) ----
+    // ---- stress_mismatch (key points only; suppressed when degraded) ----
     if (segment.isKeyPoint && !a.degraded) {
-      // ... existing stress block ...
-      // on emit, also: hasStressIssue = true;
+      const rushed = a.wpm > rushCeiling;
+      const slope = pitchSlope(signal, a);
+      const rising = slope !== null && slope > THRESHOLDS.risingPitchRatio;
+      if (rushed || rising) {
+        // One stress issue per segment. Rushed wins — pace is the more legible
+        // signal on stage — and pitch appears as corroboration in the detail.
+        const ruleId = rushed ? 'stress.key-point-rushed' : 'stress.key-point-rising-pitch';
+        const rule = ruleById(ruleId);
+
+        const pct = Math.round(((a.wpm - baseline.avgPaceWpm) / baseline.avgPaceWpm) * 100);
+        const detail = rushed
+          ? `${a.wpm} WPM vs your ${baseline.avgPaceWpm} WPM average — ${pct}% faster` +
+            (rising ? `, with pitch rising ${Math.round((slope - 1) * 100)}% across the line` : '') +
+            '. This is a key point and you delivered it like a caveat.'
+          : `Pitch rises ${Math.round(((slope ?? 1) - 1) * 100)}% across this line. ` +
+            'It is a key point stated as fact, but delivered as a question.';
+
+        pairs.push({
+          issue: {
+            type: 'stress_mismatch',
+            severity: rule.verdict,
+            timestamp: a.startSec,
+            segmentId: segment.id,
+            detail,
+          },
+          trace: {
+            segmentId: segment.id,
+            rule: ruleId,
+            observed: {
+              wpm: a.wpm,
+              baselineWpm: baseline.avgPaceWpm,
+              paceStdDev: baseline.paceStdDev,
+              ...(slope === null ? {} : { pitchRatio: r1(slope) }),
+            },
+            scriptExpectation: `Segment is marked as a key point; expected pace at or below ${r1(rushCeiling)} WPM.`,
+            verdict: rule.verdict,
+            reasoning: rule.why,
+          },
+        });
+        hasStressIssue = true;
+      }
     }
 
-    // ---- filler ----
+    // ---- filler (consecutive words collapse into one run; runs on every
+    //      segment, degraded included — filler does not need an accurate span) ----
     const runs = fillerRuns(alignment.words, a.wordIdxStart, a.wordIdxEnd);
     runs.forEach((runItem, idx) => {
       const ruleId = segment.isKeyPoint
@@ -1810,72 +2103,90 @@ In `correlateSegments`, replace the two early `continue` guards with this struct
           ? `Filler number ${idx + 1} in this segment. Density, not any single word, is what an audience notices.`
           : `"${runItem.text}" on a low-stakes line. Worth noting, not worth fixing.`;
 
-      raw.push({
-        type: 'filler', severity: rule.verdict,
-        timestamp: r1(runItem.startSec), segmentId: segment.id, detail,
-      });
-      pending.push({
-        key: `${segment.id}|filler|${r1(runItem.startSec)}`,
-        rule: ruleId,
+      pairs.push({
+        issue: {
+          type: 'filler',
+          severity: rule.verdict,
+          timestamp: r1(runItem.startSec),
+          segmentId: segment.id,
+          detail,
+        },
         trace: {
-          segmentId: segment.id, rule: ruleId,
-          observed: { fillerIndexInSegment: idx + 1, runWordCount: runItem.wordCount,
-                      segmentFillerCount: runs.length },
+          segmentId: segment.id,
+          rule: ruleId,
+          observed: {
+            fillerIndexInSegment: idx + 1,
+            runWordCount: runItem.wordCount,
+            segmentFillerCount: runs.length,
+          },
           scriptExpectation: segment.isKeyPoint
             ? 'Segment is marked as a key point; no hedging expected.'
             : 'Segment is an ordinary line; isolated fillers tolerated.',
-          verdict: rule.verdict, reasoning: rule.why,
+          verdict: rule.verdict,
+          reasoning: rule.why,
         },
       });
     });
 
-    // ---- pause ----
+    // ---- pause (marked pauses only; runs on every segment, degraded included) ----
     const medianPause = baseline.medianPauseSec;
     if (segment.markedPause && medianPause !== null &&
         a.precedingPauseSec < THRESHOLDS.markedPauseHonouredRatio * medianPause) {
       const rule = ruleById('pause.marked-not-honoured');
-      raw.push({
-        type: 'pause', severity: rule.verdict,
-        timestamp: r1(Math.max(a.startSec - 0.3, 0)), segmentId: segment.id,
-        detail: `Your script marks a pause before this line. You left ${a.precedingPauseSec}s — ` +
-                `you normally leave ${medianPause}s. The setup for this line lands flat.`,
-      });
-      pending.push({
-        key: `${segment.id}|pause|${r1(Math.max(a.startSec - 0.3, 0))}`,
-        rule: 'pause.marked-not-honoured',
+      const timestamp = r1(Math.max(a.startSec - 0.3, 0));
+      pairs.push({
+        issue: {
+          type: 'pause',
+          severity: rule.verdict,
+          timestamp,
+          segmentId: segment.id,
+          detail: `Your script marks a pause before this line. You left ${a.precedingPauseSec}s — ` +
+                  `you normally leave ${medianPause}s. The setup for this line lands flat.`,
+        },
         trace: {
-          segmentId: segment.id, rule: 'pause.marked-not-honoured',
+          segmentId: segment.id,
+          rule: 'pause.marked-not-honoured',
           observed: { precedingPauseSec: a.precedingPauseSec, medianPauseSec: medianPause },
           scriptExpectation: 'Script marks [pause] before this segment.',
-          verdict: rule.verdict, reasoning: rule.why,
+          verdict: rule.verdict,
+          reasoning: rule.why,
         },
       });
     }
 
-    // ---- pacing (suppressed when stress already reported this WPM) ----
+    // ---- pacing (ordinary lines only; suppressed by degraded OR a stress issue) ----
+    // Stress and pacing both read the same WPM observation; emitting both would
+    // double-report one fact and dilute the red tick. A segment that already
+    // produced a stress issue therefore never also produces a pacing issue.
     if (!a.degraded && !hasStressIssue && !segment.isKeyPoint) {
       const drift = Math.abs(a.wpm - baseline.avgPaceWpm);
       if (drift > THRESHOLDS.paceDriftSigma * baseline.paceStdDev) {
         const rule = ruleById('pacing.drift');
         const direction = a.wpm > baseline.avgPaceWpm ? 'faster' : 'slower';
-        raw.push({
-          type: 'pacing', severity: rule.verdict,
-          timestamp: a.startSec, segmentId: segment.id,
-          detail: `${a.wpm} WPM vs your ${baseline.avgPaceWpm} WPM average — ${direction} than usual, off a key point.`,
-        });
-        pending.push({
-          key: `${segment.id}|pacing|${a.startSec}`,
-          rule: 'pacing.drift',
+        pairs.push({
+          issue: {
+            type: 'pacing',
+            severity: rule.verdict,
+            timestamp: a.startSec,
+            segmentId: segment.id,
+            detail: `${a.wpm} WPM vs your ${baseline.avgPaceWpm} WPM average — ${direction} than usual, off a key point.`,
+          },
           trace: {
-            segmentId: segment.id, rule: 'pacing.drift',
+            segmentId: segment.id,
+            rule: 'pacing.drift',
             observed: { wpm: a.wpm, baselineWpm: baseline.avgPaceWpm, paceStdDev: baseline.paceStdDev },
             scriptExpectation: 'Ordinary line; pace expected within 1.5 SD of baseline.',
-            verdict: rule.verdict, reasoning: rule.why,
+            verdict: rule.verdict,
+            reasoning: rule.why,
           },
         });
       }
     }
   }
+
+  const { issues, trace } = numberIssuePairs(pairs);
+  return { issues, trace, baseline };
+}
 ```
 
 - [ ] **Step 5: Run the full suite**
@@ -1902,6 +2213,7 @@ WPM observation."
 **Files:**
 - Create: `packages/core-logic/src/next-step.ts`
 - Create: `packages/core-logic/src/next-step.test.ts`
+- Modify: `packages/core-logic/src/index.ts` (replace the `decideNextStep` stub with a re-export)
 
 **Interfaces:**
 - Consumes: `DeliveryReport`, `NextStep`, `NextStepContext` from `@nsh/contracts`
@@ -2075,7 +2387,24 @@ export function decideNextStep(report: DeliveryReport, ctx: NextStepContext): Ne
 Run: `npm test -w packages/core-logic -- next-step`
 Expected: PASS — 10 tests green
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Replace the `decideNextStep` stub in `index.ts`**
+
+Delete the `decideNextStep` stub from `packages/core-logic/src/index.ts`:
+
+```ts
+/** tool 5: decides the closing action. Never executes it — that is P2's job. */
+export function decideNextStep(_report: DeliveryReport, _ctx: NextStepContext): NextStep {
+  throw new Error(`decideNextStep: ${PENDING}`);
+}
+```
+
+and add the module re-export:
+
+```ts
+export * from './next-step.js';
+```
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add packages/core-logic/src/next-step.ts packages/core-logic/src/next-step.test.ts packages/core-logic/src/index.ts
@@ -2093,13 +2422,22 @@ person to rehearse with (SPEC §2)."
 **Files:**
 - Create: `packages/core-logic/src/prosody.ts`
 - Create: `packages/core-logic/src/prosody.test.ts`
-- Modify: `packages/core-logic/src/align.ts` (fill `meanRms` / `meanF0`)
+- Modify: `packages/core-logic/src/align.ts` (fill `meanRms` / `meanF0`, add the `prosody` param)
+- Modify: `packages/core-logic/src/index.ts` (replace the `extractProsody` stub with a re-export)
+- Modify: `packages/contracts/src/index.ts` (Tier-2: `CoreLogic.alignSegments` gains an optional `prosody` param)
 
 **Interfaces:**
 - Consumes: `pitchfinder`; `ProsodyTrack`, `ProsodyFrame` from `@nsh/contracts`; `THRESHOLDS`, `CoachError`
 - Produces: `extractProsody(pcm: Float32Array, sampleRate: number): ProsodyTrack`
 
 Built last on purpose. Everything above already works with a zero-frame track.
+
+**Heads-up P2:** this task adds a third, optional parameter to `alignSegments`
+(`prosody?: ProsodyTrack`, defaulted to a zero-frame track). Because the impl
+signature changes, the `CoreLogic.alignSegments` declaration in
+`packages/contracts/src/index.ts` is updated to match (Step 4b below). Internal
+P1↔P2 seam, heads-up in chat, no sign-off (CONVENTIONS §2). The default keeps
+every existing 2-arg call site — Tasks 5–10 and their tests — valid.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2239,7 +2577,9 @@ export function extractProsody(pcm: Float32Array, sampleRate: number): ProsodyTr
 
 - [ ] **Step 4: Fill meanRms and meanF0 in align.ts**
 
-Replace the two placeholder lines in `alignSegments` with a prosody lookup. Change the signature to accept the track:
+Add `ProsodyTrack` to the type import at the top of `align.ts`
+(`import type { AlignmentResult, ProsodyTrack, ScriptSegment, SegmentAlignment, Transcript } from '@nsh/contracts';`),
+then change the `alignSegments` signature to accept the track:
 
 ```ts
 export function alignSegments(
@@ -2249,7 +2589,9 @@ export function alignSegments(
 ): AlignmentResult {
 ```
 
-and inside the per-segment loop, replace `meanRms: 0` / `meanF0: null` with:
+and inside the per-segment loop, compute the prosody means from the segment's
+(rounded) `startSec`/`endSec` and replace the `meanRms: 0` / `meanF0: null`
+placeholder fields in the pushed object:
 
 ```ts
     const inWindow = prosody.frames.filter((f) => f.t >= startSec && f.t < endSec);
@@ -2264,19 +2606,64 @@ then use `meanRms: r1(meanRms)` and `meanF0: meanF0 === null ? null : r1(meanF0)
 
 The default parameter keeps every existing call site and test working unchanged.
 
-- [ ] **Step 5: Install pitchfinder and run the suite**
+- [ ] **Step 4b: Update the `alignSegments` signature in contracts**
+
+The impl now takes a third parameter, so update the `CoreLogic.alignSegments`
+declaration in `packages/contracts/src/index.ts` to match (Tier-2, heads-up to
+P2 — see the Heads-up note above). Make the parameter optional so 2-arg callers
+stay valid:
+
+```ts
+  /** tool 3a: map each script segment onto its region of the recording. */
+  alignSegments(
+    transcript: Transcript,
+    segments: ScriptSegment[],
+    prosody?: ProsodyTrack,
+  ): AlignmentResult;
+```
+
+- [ ] **Step 5: Verify pitchfinder is installed, then run the suite**
+
+`pitchfinder` is already declared in `packages/core-logic/package.json`
+(`"pitchfinder": "^2.3.2"`), so do **not** re-add it — a redundant
+`npm install pitchfinder -w packages/core-logic` would only churn the lockfile.
+Verify it resolves, and install only if the workspace `node_modules` is missing it:
 
 ```bash
-npm install pitchfinder -w packages/core-logic
+node -e "import('pitchfinder').then(() => console.log('pitchfinder OK')).catch((e) => { console.error(e.message); process.exit(1); })"
+# only if the check above fails:
+# npm install
 ```
 
 Run: `npm test -w packages/core-logic && npm run typecheck --workspaces`
 Expected: PASS — all green
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Replace the `extractProsody` stub in `index.ts`**
+
+Delete the `extractProsody` stub from `packages/core-logic/src/index.ts` — this is
+the last of the seven stubs, so after this step `index.ts` is pure re-exports:
+
+```ts
+/** tool 2b: deterministic half of transcribe_delivery. Pure DSP. */
+export function extractProsody(_pcm: Float32Array, _sampleRate: number): ProsodyTrack {
+  throw new Error(`extractProsody: ${PENDING}`);
+}
+```
+
+and add the module re-export:
+
+```ts
+export * from './prosody.js';
+```
+
+With every stub gone, the `import type { ... }` block and the `PENDING` constant
+at the top of `index.ts` are now unused — delete them so `index.ts` is nothing
+but the `export * from './*.js'` lines (matching the File Structure table).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add packages/core-logic/src/prosody.ts packages/core-logic/src/prosody.test.ts packages/core-logic/src/align.ts packages/core-logic/src/index.ts package-lock.json
+git add packages/core-logic/src/prosody.ts packages/core-logic/src/prosody.test.ts packages/core-logic/src/align.ts packages/core-logic/src/index.ts packages/contracts/src/index.ts
 git commit -m "feat(core-logic): extractProsody — RMS envelope and YIN pitch
 
 Pure DSP over Float32Array; no vendor and no Python sidecar. Out-of-band
@@ -2290,7 +2677,9 @@ call site keeps working."
 ### Task 12: Regenerate fixtures and tune thresholds
 
 **Files:**
+- Modify: `package.json` (add `tsx` to root devDependencies)
 - Create: `scripts/build-report.mjs`
+- Create: `packages/core-logic/src/golden.test.ts`
 - Modify: `packages/contracts/fixtures/report.rough.json` (regenerated)
 - Modify: `packages/contracts/fixtures/report.clean.json` (regenerated)
 - Modify: `packages/core-logic/src/thresholds.ts` (tuning only)
@@ -2299,14 +2688,28 @@ call site keeps working."
 - Consumes: every function from Tasks 1–11
 - Produces: regenerated fixtures that still satisfy all 19 tests in `packages/contracts/src/fixtures.test.ts`
 
-- [ ] **Step 1: Write the report generator**
+- [ ] **Step 1: Add the `tsx` runner, then write the report generator**
+
+First add `tsx` to the root devDependencies — it is the runner for this script:
+
+```bash
+npm i -D tsx
+```
+
+`tsx` (not `node --experimental-strip-types`) because the script imports
+`@nsh/core-logic`, which resolves through a workspace symlink into `node_modules`;
+Node's `--experimental-strip-types` refuses to strip types from files under
+`node_modules`, so it cannot load the workspace package. `tsx` strips types
+everywhere, symlinked workspace packages included.
+
+Then write the generator:
 
 ```js
 #!/usr/bin/env node
 // scripts/build-report.mjs
 //
 // Regenerates the demo fixtures from real transcripts. Run after any threshold
-// change:  node --experimental-strip-types scripts/build-report.mjs
+// change:  npx tsx scripts/build-report.mjs
 //
 // The fixture is NEVER hand-edited to match whatever the code produced — that
 // would delete the only signal telling us the rules are miscalibrated.
@@ -2352,7 +2755,7 @@ for (const label of ['clean', 'rough']) {
 - [ ] **Step 2: Generate and check against the invariants**
 
 ```bash
-node --experimental-strip-types scripts/build-report.mjs && npm test -w packages/contracts
+npx tsx scripts/build-report.mjs && npm test -w packages/contracts
 ```
 
 Expected: `rough` reports exactly 1 high on `seg-003`; `clean` reports 0 high; all 19 contract tests pass.
@@ -2365,6 +2768,7 @@ The 19 tests are the **tuning target, not the output**. If they fail, change `TH
 |---|---|
 | More than one high-severity issue | raise `paceDriftSigma` (1.5 → 2.0) |
 | No high-severity issue | lower `paceDriftSigma` (1.5 → 1.2); if still none, the take did not rush the key stat — re-record |
+| Clean take has a non-`low` issue | `fixtures.test.ts` (~line 77) requires **every** clean-take issue to be `low` — stricter than "no high". Raise the `filler.density` / in-key-point thresholds so an isolated hedge stays `low`; if a lone hard filler lands in a key point, make `filler.in-key-point`'s verdict depend on run length (single filler → `low`) by adjusting the `SEVERITY_RULES` table. Never edit the fixture test. |
 | `fillerCount` disagrees with filler issues | a filler run spans a segment boundary; widen the run-grouping window |
 | Pause issue missing on `seg-003` | raise `markedPauseHonouredRatio` (0.5 → 0.7) |
 | Too many pacing issues | raise `paceDriftSigma` |
@@ -2416,7 +2820,7 @@ Expected: PASS — contracts 19 + core-logic suites all green
 - [ ] **Step 6: Commit and hand off**
 
 ```bash
-git add scripts/build-report.mjs packages/contracts/fixtures/report.clean.json packages/contracts/fixtures/report.rough.json packages/core-logic/src/thresholds.ts packages/core-logic/src/golden.test.ts
+git add package.json package-lock.json scripts/build-report.mjs packages/contracts/fixtures/report.clean.json packages/contracts/fixtures/report.rough.json packages/core-logic/src/thresholds.ts packages/core-logic/src/golden.test.ts
 git commit -m "feat: regenerate demo fixtures from real transcripts
 
 Fixtures now come from actual Deepgram output rather than hand-written
@@ -2430,9 +2834,11 @@ Heads-up to P3: report.*.json numbers changed, shape did not."
 
 ## Self-review
 
-**Spec coverage:** §4 tokenize → Task 1. §5 parseScript → Task 2. §6 alignSegments incl. degraded mode → Tasks 4–5. §7 computeBaseline → Task 6. §8 rules and emission → Tasks 7, 9. §9 generateSummary → Task 8. §10 decideNextStep → Task 10. §11 extractProsody → Task 11. §12 testing and fixture regeneration → Tasks 3, 12. §13 error codes → Tasks 2 (`SCRIPT_*`), 5 (`ALIGNMENT_FAILED`), 11 (`AUDIO_TOO_SHORT`). §14 build order → task order. All covered.
+**Spec coverage:** §4 tokenize → Task 1. §5 parseScript → Task 2. §6 alignSegments incl. degraded mode → Tasks 4–5. §7 computeBaseline → Task 6. §8 rules and emission → Tasks 7, 9. §9 generateSummary → Task 8. §10 decideNextStep → Task 10. §11 extractProsody → Task 11. §12 testing and fixture regeneration → Tasks 3, 12. §13 error codes → Tasks 1 (`INTERNAL`), 2 (`SCRIPT_*`), 5 (`ALIGNMENT_FAILED`), 11 (`AUDIO_TOO_SHORT`). §14 build order → task order. All covered.
 
-**Type consistency:** `AlignmentResult` is defined in Task 5 and consumed under that name in Tasks 6, 7, 9, 12. `RawIssue` defined in Task 7, used in Task 9. `alignSegments` gains its third parameter in Task 11 with a default, so Tasks 5–10 call sites stay valid. `computeBaseline(alignments, words, prosody)` is used with that arity throughout. `r1` is redeclared per module rather than shared — deliberate, it keeps each module free-standing.
+**Index stub removal:** `index.ts` ships with seven throwing stubs. Each is deleted by the task that implements it and replaced with `export * from './<module>.js'` in the same step: `parseScript` (Task 2), `alignSegments` (Task 5, alongside `needlemanWunsch` from `./align.js`), `computeBaseline` (Task 6), `correlateSegments` (Task 7), `generateSummary` (Task 8), `decideNextStep` (Task 10), `extractProsody` (Task 11). By the end of Task 11 `index.ts` is pure re-exports (`errors`/`thresholds`/`tokenize` from Task 1 plus the seven module re-exports), matching the File Structure table. Every task that removes a stub lists `packages/core-logic/src/index.ts` in its `git add`.
 
-**Known deviation from the frozen contract:** two Tier-2 changes, both flagged in Task 5 and Task 6 and both requiring a heads-up to P2, not sign-off.
+**Type consistency:** `AlignmentResult` now lives in `@nsh/contracts` (added in Task 5), re-exported from `./align.js` so `import { AlignmentResult } from './align.js'` in Task 7 still resolves; consumed in Tasks 6, 7, 9, 12. `RawIssue`/`RawTrace`/`IssuePair` and the shared `compareIssues` comparator are defined in Task 7 and reused unchanged by Task 9's superset `correlateSegments` (Task 9 only adds `pairs.push(...)` blocks). Issue↔trace association is positional (sorted as pairs, numbered after) — never a `segmentId|type|timestamp` key that could collide. `alignSegments` gains its optional third parameter (`prosody?`) in Task 11 with a default, so Tasks 5–10 two-arg call sites stay valid; the `CoreLogic.alignSegments` contract declaration is updated in the same task. `computeBaseline(alignments, words, prosody)` is used with that arity throughout. `r1` is redeclared per module rather than shared — deliberate, it keeps each module free-standing.
+
+**Known deviations from the frozen contract (all Tier-2, heads-up to P2, no sign-off — CONVENTIONS §2):** (1) `SegmentAlignment.degraded` — Task 5; (2) `AlignmentResult` type — Task 5; (3) `CoreLogic.alignSegments` return type → `AlignmentResult` and `CoreLogic.correlateSegments` param → `AlignmentResult` — Task 5; (4) `Baseline.medianPauseSec` — Task 6; (5) `CoreLogic.alignSegments` optional `prosody` param — Task 11. Plus one internal error-taxonomy change: the `INTERNAL` code added to `CoachError` in `errors.ts` — Task 1 (not a contract type, no P2 heads-up needed).
 
