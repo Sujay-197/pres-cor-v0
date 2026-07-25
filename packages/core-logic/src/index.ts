@@ -20,9 +20,9 @@ import type {
   ScriptSegment,
   SegmentAlignment,
   Severity,
-  Transcript,
 } from '@nsh/contracts';
 
+export * from './align.js';
 export * from './errors.js';
 export * from './next-step.js';
 export * from './parse-script.js';
@@ -38,14 +38,6 @@ const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
 /** tool 2b: deterministic half of transcribe_delivery. Pure DSP. */
 export function extractProsody(_pcm: Float32Array, _sampleRate: number): ProsodyTrack {
   throw new Error(`extractProsody: ${PENDING}`);
-}
-
-/** tool 3a: map each script segment onto its region of the recording. */
-export function alignSegments(
-  _transcript: Transcript,
-  _segments: ScriptSegment[],
-): SegmentAlignment[] {
-  throw new Error(`alignSegments: ${PENDING}`);
 }
 
 /** tool 3b: THE BRANCH. Cross-references script intent against delivery signal. */

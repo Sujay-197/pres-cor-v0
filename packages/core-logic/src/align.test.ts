@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { needlemanWunsch } from './align.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { CoachError } from './errors.js';
+import { alignSegments } from './align.js';
+import { parseScript } from './parse-script.js';
 
 const ops = (a: string[], b: string[]) => needlemanWunsch(a, b).map((p) => p.op);
 
@@ -62,5 +67,90 @@ describe('needlemanWunsch', () => {
     const t0 = performance.now();
     needlemanWunsch(a, b);
     expect(performance.now() - t0).toBeLessThan(500);
+  });
+});
+
+const fixtures = join(import.meta.dirname, '../../contracts/fixtures');
+const demoScript = readFileSync(join(fixtures, 'script.demo.md'), 'utf8');
+const rough = JSON.parse(readFileSync(join(fixtures, 'transcript.rough.json'), 'utf8'));
+
+/** Same 1-decimal rounding the implementation uses, so wpm can be asserted exactly. */
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+describe('alignSegments', () => {
+  const segments = parseScript(demoScript);
+  const result = alignSegments(rough, segments);
+
+  it('returns one alignment per segment, in order', () => {
+    expect(result.alignments.map((a) => a.segmentId)).toEqual(segments.map((s) => s.id));
+  });
+
+  it('matches most of the script', () => {
+    expect(result.matchRate).toBeGreaterThan(0.75);
+  });
+
+  it('produces monotonically increasing, non-overlapping spans', () => {
+    const a = result.alignments;
+    for (let i = 1; i < a.length; i++) {
+      expect(a[i]!.startSec).toBeGreaterThanOrEqual(a[i - 1]!.endSec);
+    }
+  });
+
+  it('keeps every span inside the recording', () => {
+    for (const a of result.alignments) {
+      expect(a.startSec).toBeGreaterThanOrEqual(0);
+      expect(a.endSec).toBeLessThanOrEqual(rough.durationSec);
+      expect(a.endSec).toBeGreaterThan(a.startSec);
+    }
+  });
+
+  it('degrades no segment on a good take', () => {
+    expect(result.alignments.every((a) => !a.degraded)).toBe(true);
+    expect(result.alignments.filter((a) => a.degraded)).toHaveLength(0);
+  });
+
+  it('finds the rushed key point — seg-003 is the fastest segment', () => {
+    const byWpm = [...result.alignments].sort((x, y) => y.wpm - x.wpm);
+    expect(byWpm[0]!.segmentId).toBe('seg-003');
+  });
+
+  it('does NOT treat "like" in seg-006 as a filler', () => {
+    // script.demo.md:11 — "I'd like to talk about ... look like".
+    const seg6 = result.alignments.find((a) => a.segmentId === 'seg-006')!;
+    expect(seg6.fillerCount).toBe(0);
+  });
+
+  it('tags hard fillers spoken in seg-002', () => {
+    const seg2 = result.alignments.find((a) => a.segmentId === 'seg-002')!;
+    expect(seg2.fillerCount).toBeGreaterThan(0);
+  });
+
+  it('computes precedingPauseSec from the previous segment end', () => {
+    const a = result.alignments;
+    expect(a[0]!.precedingPauseSec).toBeCloseTo(a[0]!.startSec, 5);
+    for (let i = 1; i < a.length; i++) {
+      expect(a[i]!.precedingPauseSec).toBeCloseTo(a[i]!.startSec - a[i - 1]!.endSec, 5);
+    }
+  });
+
+  it('excludes fillers from wpm', () => {
+    // Derive the expected value from the PUBLIC outputs rather than a hand-guess:
+    // count the non-filler words the alignment attributed to seg-002, and use the
+    // segment's own rounded startSec/endSec. The implementation computes wpm from
+    // those same rounded fields, so the equality is exact, not approximate.
+    const seg2 = result.alignments.find((a) => a.segmentId === 'seg-002')!;
+    const n = result.words.slice(seg2.wordIdxStart, seg2.wordIdxEnd).filter((w) => !w.isFiller).length;
+    expect(seg2.wpm).toBe(r1((n / (seg2.endSec - seg2.startSec)) * 60));
+  });
+
+  it('throws ALIGNMENT_FAILED when the audio is not this script', () => {
+    const wrong = parseScript('completely unrelated words about marine biology\n\nand tidal patterns');
+    try {
+      alignSegments(rough, wrong);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(CoachError);
+      expect((e as CoachError).code).toBe('ALIGNMENT_FAILED');
+    }
   });
 });

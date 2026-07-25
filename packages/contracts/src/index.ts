@@ -173,8 +173,29 @@ export const SegmentAlignment = z.object({
   meanF0: z.number().nullable(),
   /** Silence between the previous segment's last word and this one's first. */
   precedingPauseSec: z.number(),
+  /**
+   * True when this segment matched no script tokens and fell back to a
+   * proportional span. A degraded segment suppresses its own pacing and
+   * stress verdicts — proportional splitting assumes uniform WPM in order
+   * to measure WPM deviation, so feeding it the pacing rules would report a
+   * clean delivery rather than a broken one.
+   */
+  degraded: z.boolean(),
 });
 export type SegmentAlignment = z.infer<typeof SegmentAlignment>;
+
+/**
+ * Return of alignSegments. `words` carries `isFiller` finalised after
+ * soft-filler resolution, so the caller gets the updated words rather than a
+ * bare SegmentAlignment[]. Tier-2 (P1<->P2 seam), never shipped to the widget.
+ */
+export const AlignmentResult = z.object({
+  alignments: z.array(SegmentAlignment),
+  words: z.array(Word),
+  /** Matched script tokens / total script tokens. Below 0.4 alignSegments throws. */
+  matchRate: z.number(),
+});
+export type AlignmentResult = z.infer<typeof AlignmentResult>;
 
 /**
  * The speaker's own norms, computed from THIS recording — never a population
@@ -287,13 +308,13 @@ export interface CoreLogic {
   extractProsody(pcm: Float32Array, sampleRate: number): ProsodyTrack;
 
   /** tool 3a: map each script segment onto its region of the recording. */
-  alignSegments(transcript: Transcript, segments: ScriptSegment[]): SegmentAlignment[];
+  alignSegments(transcript: Transcript, segments: ScriptSegment[]): AlignmentResult;
 
   /** tool 3b: THE BRANCH. Cross-reference script intent against delivery signal. */
   correlateSegments(
     signal: DeliverySignal,
     segments: ScriptSegment[],
-    alignments: SegmentAlignment[],
+    alignment: AlignmentResult,
   ): CorrelationResult;
 
   /** tool 4: generate_summary */
