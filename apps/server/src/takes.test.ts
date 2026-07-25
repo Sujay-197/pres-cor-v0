@@ -5,8 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AUDIO_DIR,
   FIXTURE_DIR,
+  TAKE_ID_PATTERN,
+  UPLOAD_DIR,
   UPLOAD_ID_PREFIX,
   frozenTranscriptPath,
+  isValidTakeId,
   labelForTake,
   listTakes,
   mimeTypeForFile,
@@ -133,6 +136,54 @@ describe('resolveTakeAudio', () => {
       mimeType: 'audio/mpeg',
     });
     expect(resolveTakeAudio(audioDir, uploadDir, 'missing')).toBeNull();
+  });
+});
+
+describe('isValidTakeId', () => {
+  it('accepts valid staged and upload ids', () => {
+    expect(isValidTakeId('rough')).toBe(true);
+    expect(isValidTakeId('clean')).toBe(true);
+    expect(isValidTakeId('up-0123456789ab')).toBe(true);
+    expect(isValidTakeId('a')).toBe(true);
+    expect(isValidTakeId('abc-def-ghi')).toBe(true);
+  });
+
+  it('rejects path traversal attempts and unsafe characters', () => {
+    expect(isValidTakeId('../../../../../package')).toBe(false);
+    expect(isValidTakeId('../transcript.rough')).toBe(false);
+    expect(isValidTakeId('a/b')).toBe(false);
+    expect(isValidTakeId('..\\..\\x')).toBe(false);
+    expect(isValidTakeId('.')).toBe(false);
+    expect(isValidTakeId('..')).toBe(false);
+    expect(isValidTakeId('my.file')).toBe(false);
+    expect(isValidTakeId('-start')).toBe(false);
+  });
+});
+
+describe('frozenTranscriptPath', () => {
+  it('rejects path traversal attempts and returns null', () => {
+    expect(frozenTranscriptPath(FIXTURE_DIR, '../../../../../package')).toBeNull();
+    expect(frozenTranscriptPath(FIXTURE_DIR, '../transcript.rough')).toBeNull();
+    expect(frozenTranscriptPath(FIXTURE_DIR, 'a/b')).toBeNull();
+    expect(frozenTranscriptPath(FIXTURE_DIR, '..\\..\\x')).toBeNull();
+  });
+
+  it('resolves real frozen transcripts to existing paths', () => {
+    expect(frozenTranscriptPath(FIXTURE_DIR, 'rough')).not.toBeNull();
+    expect(frozenTranscriptPath(FIXTURE_DIR, 'clean')).not.toBeNull();
+  });
+});
+
+describe('listTakes against real repo directories', () => {
+  it('discovers takes from real repo paths', () => {
+    const takes = listTakes(AUDIO_DIR, UPLOAD_DIR, FIXTURE_DIR);
+    const ids = takes.map((t) => t.id);
+    // Audio files are gitignored, so we only guarantee frozen transcripts
+    expect(ids).toContain('rough');
+    expect(ids).toContain('clean');
+    // Verify the frozen transcripts are marked as such
+    expect(takes.find((t) => t.id === 'rough')!.hasFrozenTranscript).toBe(true);
+    expect(takes.find((t) => t.id === 'clean')!.hasFrozenTranscript).toBe(true);
   });
 });
 

@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** apps/server/src -> apps/server -> apps -> repo root. */
@@ -30,6 +30,16 @@ export const AUDIO_MIME_BY_EXT: Record<string, string> = {
 };
 
 export const UPLOAD_ID_PREFIX = 'up-';
+
+/** Take IDs must be alphanumeric (lowercase) and hyphens only — rejects `.`, `/`, `\` and
+ * path traversal attempts. Multi-dot filenames are not addressable to prevent confusion
+ * with path separators; takeIdFromFilename may extract ids with dots from filenames like
+ * `take-my.old.name.m4a`, but listTakes filters them out. */
+export const TAKE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+export function isValidTakeId(id: string): boolean {
+  return TAKE_ID_PATTERN.test(id);
+}
 
 const TAKE_PREFIX = 'take-';
 
@@ -60,7 +70,12 @@ export function labelForTake(takeId: string): string {
 }
 
 export function frozenTranscriptPath(fixtureDir: string, takeId: string): string | null {
+  if (!isValidTakeId(takeId)) return null;
   const path = join(fixtureDir, `transcript.${takeId}.json`);
+  // Defense in depth: confirm the resolved path is still within fixtureDir.
+  const resolvedPath = resolve(path);
+  const resolvedFixtureDir = resolve(fixtureDir);
+  if (!resolvedPath.startsWith(resolvedFixtureDir + sep)) return null;
   return existsSync(path) ? path : null;
 }
 
@@ -77,7 +92,7 @@ export function listTakes(audioDir: string, uploadDir: string, fixtureDir: strin
     for (const entry of entriesOf(dir)) {
       const id = takeIdFromFilename(entry);
       const mimeType = mimeTypeForFile(entry);
-      if (id === null || mimeType === null || seen.has(id)) continue;
+      if (id === null || mimeType === null || !isValidTakeId(id) || seen.has(id)) continue;
       seen.add(id);
       out.push({
         id,
@@ -94,8 +109,9 @@ export function listTakes(audioDir: string, uploadDir: string, fixtureDir: strin
   for (const entry of entriesOf(fixtureDir)) {
     const match = /^transcript\.(.+)\.json$/.exec(entry);
     const id = match?.[1];
-    if (id === undefined || seen.has(id)) continue;
+    if (id === undefined || !isValidTakeId(id) || seen.has(id)) continue;
     seen.add(id);
+    // Placeholder mime type for transcript-only takes; not a real content-type claim.
     out.push({ id, label: labelForTake(id), mimeType: 'audio/mp4', hasFrozenTranscript: true });
   }
 
@@ -124,6 +140,7 @@ export function uploadTakeId(bytes: Uint8Array): string {
 }
 
 export function uploadFilenameFor(takeId: string, originalName: string): string | null {
+  if (!isValidTakeId(takeId)) return null;
   const ext = extname(originalName).toLowerCase();
   if (!(ext in AUDIO_MIME_BY_EXT)) return null;
   return `${TAKE_PREFIX}${takeId}${ext}`;
