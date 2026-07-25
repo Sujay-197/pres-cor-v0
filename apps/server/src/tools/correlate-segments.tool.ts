@@ -11,6 +11,7 @@ import {
   ScriptSegment,
 } from '@nsh/contracts';
 import { alignSegments, correlateSegments } from '@nsh/core-logic';
+import { parseToolInput } from './parse-input.js';
 
 export const CorrelateSegmentsInput = z.object({
   signal: DeliverySignal,
@@ -21,7 +22,7 @@ export type CorrelateSegmentsInput = z.infer<typeof CorrelateSegmentsInput>;
 export const CorrelateSegmentsOutput = CorrelationResult;
 
 export function correlateSegmentsTool(input: CorrelateSegmentsInput): CorrelationResult {
-  const { signal, segments } = CorrelateSegmentsInput.parse(input);
+  const { signal, segments } = parseToolInput(CorrelateSegmentsInput, input, 'correlateSegmentsTool');
   const alignment = alignSegments(signal.transcript, segments, signal.prosody);
   return correlateSegments(signal, segments, alignment);
 }

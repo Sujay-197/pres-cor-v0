@@ -4,6 +4,8 @@
  */
 
 export type CoachErrorCode =
+  // Request/tool input failed schema validation — the most general input failure.
+  | 'BAD_INPUT'
   | 'SCRIPT_EMPTY'
   | 'SCRIPT_NO_SEGMENTS'
   | 'AUDIO_UNREADABLE'

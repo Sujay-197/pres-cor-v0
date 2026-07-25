@@ -47,4 +47,16 @@ describe('parseScriptTool', () => {
     expect(thrown).toBeInstanceOf(CoachError);
     expect((thrown as CoachError).code).toBe('SCRIPT_NO_SEGMENTS');
   });
+
+  it('raises a CoachError with code BAD_INPUT for malformed input, not a raw ZodError', () => {
+    let thrown: unknown;
+    try {
+      // @ts-expect-error - deliberately malformed to exercise input validation
+      parseScriptTool({ raw: 123 });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    expect((thrown as CoachError).code).toBe('BAD_INPUT');
+  });
 });

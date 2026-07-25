@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { ScriptSegment } from '@nsh/contracts';
 import { parseScript } from '@nsh/core-logic';
+import { parseToolInput } from './parse-input.js';
 
 export const ParseScriptInput = z.object({ raw: z.string() });
 export type ParseScriptInput = z.infer<typeof ParseScriptInput>;
@@ -14,5 +15,5 @@ export type ParseScriptInput = z.infer<typeof ParseScriptInput>;
 export const ParseScriptOutput = z.array(ScriptSegment);
 
 export function parseScriptTool(input: ParseScriptInput): ScriptSegment[] {
-  return parseScript(ParseScriptInput.parse(input).raw);
+  return parseScript(parseToolInput(ParseScriptInput, input, 'parseScriptTool').raw);
 }

@@ -10,6 +10,7 @@ import { CoachError } from '@nsh/core-logic';
 import { prosodyForFile } from '../adapters/audio-decode.js';
 import type { ServerDeps } from '../pipeline.js';
 import { resolveTakeAudio } from '../takes.js';
+import { parseToolInput } from './parse-input.js';
 
 export const TranscribeDeliveryInput = z.object({ takeId: z.string().min(1) });
 export type TranscribeDeliveryInput = z.infer<typeof TranscribeDeliveryInput>;
@@ -20,7 +21,7 @@ export async function transcribeDeliveryTool(
   input: TranscribeDeliveryInput,
   deps: ServerDeps,
 ): Promise<DeliverySignal> {
-  const { takeId } = TranscribeDeliveryInput.parse(input);
+  const { takeId } = parseToolInput(TranscribeDeliveryInput, input, 'transcribeDeliveryTool');
   const client = deps.createStt(deps.config, takeId, deps.fixtureDir);
 
   // Transport wiring, not domain logic: the fixture client replays a committed

@@ -7,6 +7,7 @@
 import { CoachError, type CoachErrorCode } from '@nsh/core-logic';
 
 export const ERROR_STATUS: Record<CoachErrorCode, number> = {
+  BAD_INPUT: 400,
   SCRIPT_EMPTY: 400,
   SCRIPT_NO_SEGMENTS: 400,
   AUDIO_UNREADABLE: 415,

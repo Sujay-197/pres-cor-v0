@@ -66,4 +66,16 @@ describe('correlateSegmentsTool', () => {
     expect(thrown).toBeInstanceOf(CoachError);
     expect((thrown as CoachError).code).toBe('ALIGNMENT_FAILED');
   });
+
+  it('raises a CoachError with code BAD_INPUT for malformed input, not a raw ZodError', () => {
+    let thrown: unknown;
+    try {
+      // @ts-expect-error - deliberately malformed to exercise input validation
+      correlateSegmentsTool({ signal: null, segments });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    expect((thrown as CoachError).code).toBe('BAD_INPUT');
+  });
 });

@@ -3,6 +3,7 @@ import { CoachError, type CoachErrorCode } from '@nsh/core-logic';
 import { ERROR_STATUS, GENERIC_MESSAGE, mapError } from './errors.js';
 
 const CASES: Array<[CoachErrorCode, number]> = [
+  ['BAD_INPUT', 400],
   ['SCRIPT_EMPTY', 400],
   ['SCRIPT_NO_SEGMENTS', 400],
   ['AUDIO_UNREADABLE', 415],
@@ -35,6 +36,14 @@ describe('mapError', () => {
     expect(mapped.body).toEqual({ error: { code: 'INTERNAL', message: GENERIC_MESSAGE } });
     expect(JSON.stringify(mapped.body)).not.toContain('ACME-1234');
     expect(mapped.logMessage).toContain('ACME-1234');
+  });
+
+  it('maps a BAD_INPUT CoachError to 400 with the code and message in the body', () => {
+    const mapped = mapError(new CoachError('BAD_INPUT', 'parseScriptTool: invalid input at "raw" (invalid_type).', { issues: [{ path: ['raw'], code: 'invalid_type' }] }));
+    expect(mapped.status).toBe(400);
+    expect(mapped.body).toEqual({
+      error: { code: 'BAD_INPUT', message: 'parseScriptTool: invalid input at "raw" (invalid_type).' },
+    });
   });
 
   it('turns a thrown non-Error into a 500 with a generic message', () => {

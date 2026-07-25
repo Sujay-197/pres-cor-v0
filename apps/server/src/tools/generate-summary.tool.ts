@@ -8,6 +8,7 @@ import {
   ScriptSegment,
 } from '@nsh/contracts';
 import { generateSummary } from '@nsh/core-logic';
+import { parseToolInput } from './parse-input.js';
 
 export const GenerateSummaryInput = z.object({
   segments: z.array(ScriptSegment),
@@ -23,6 +24,6 @@ export type GenerateSummaryInput = z.infer<typeof GenerateSummaryInput>;
 export const GenerateSummaryOutput = DeliveryReport;
 
 export function generateSummaryTool(input: GenerateSummaryInput): DeliveryReport {
-  const { segments, correlation, signal, meta } = GenerateSummaryInput.parse(input);
+  const { segments, correlation, signal, meta } = parseToolInput(GenerateSummaryInput, input, 'generateSummaryTool');
   return generateSummary(segments, correlation, signal, meta);
 }

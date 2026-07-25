@@ -98,6 +98,14 @@ describe('transcribeDeliveryTool', () => {
     });
   });
 
+  it('raises a CoachError with code BAD_INPUT for malformed input, not a raw ZodError', async () => {
+    const deps = createDeps(loadConfig(FIXTURE_ENV));
+    await expect(
+      // @ts-expect-error - deliberately malformed to exercise input validation
+      transcribeDeliveryTool({ takeId: 42 }, deps),
+    ).rejects.toMatchObject({ name: 'CoachError', code: 'BAD_INPUT' });
+  });
+
   it('raises AUDIO_UNREADABLE for a real provider when no audio file is on disk', async () => {
     const stubTranscript: Transcript = { provider: 'deepgram', durationSec: 1, words: [] };
     const overrides: Partial<ServerDeps> = {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DeliveryReport, isAllowedAudioUrl, type ScriptSegment } from '@nsh/contracts';
+import { CoachError } from '@nsh/core-logic';
 import { loadConfig } from '../config.js';
 import { createDeps } from '../pipeline.js';
 import { FIXTURE_DIR } from '../takes.js';
@@ -79,5 +80,17 @@ describe('generateSummaryTool', () => {
       meta: { reportId: 'rpt-demo-clean', audioUrl: null },
     });
     expect(report.audioUrl).toBeNull();
+  });
+
+  it('raises a CoachError with code BAD_INPUT for malformed input, not a raw ZodError', async () => {
+    let thrown: unknown;
+    try {
+      // @ts-expect-error - deliberately malformed to exercise input validation
+      generateSummaryTool({ segments, correlation: null, signal: null, meta: { reportId: '', audioUrl: null } });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    expect((thrown as CoachError).code).toBe('BAD_INPUT');
   });
 });
