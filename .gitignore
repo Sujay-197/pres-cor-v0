@@ -21,3 +21,7 @@ fixtures/audio/*.webm
 fixtures/audio/*.mp4
 fixtures/audio/*.m4a
 !fixtures/audio/.gitkeep
+
+# Uploaded takes are content-addressed and regenerated on demand. The extension
+# globs above do not cross a directory separator, so this needs its own line.
+fixtures/audio/uploads/
