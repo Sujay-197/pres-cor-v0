@@ -5,8 +5,17 @@ import { CoachError } from './errors.js';
 export const THRESHOLDS = {
   /** A gap longer than this between words counts as a pause, in seconds. */
   pauseMinSec: 0.35,
-  /** Pace beyond baseline ± this many standard deviations is drift. */
-  paceDriftSigma: 1.5,
+  /**
+   * Pace beyond baseline ± this many standard deviations is drift.
+   * Lowered from 1.5 to 0.4 (Task 7): seg-006's short-span 313 WPM end-blurt
+   * inflates paceStdDev to ~71.8, pushing the rush ceiling at 1.5σ to ~252 WPM
+   * — unreachable by seg-005's genuine 180 WPM rush on a ~143.9 WPM baseline.
+   * At 0.4σ the ceiling is ~172.6 WPM: seg-005 (180 WPM) clears it, seg-003
+   * (150 WPM, honours its marked pause) stays clean. Task 9's duration guard
+   * keeps that same short-span outlier out of the pacing verdicts so this
+   * tighter band doesn't have to compensate for it forever.
+   */
+  paceDriftSigma: 0.4,
   /** Fillers in one segment beyond this count escalate low -> medium. */
   fillerDensityPerSegment: 2,
   /** A marked pause honoured at less than this fraction of median is skipped. */

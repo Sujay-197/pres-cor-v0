@@ -22,6 +22,7 @@ import type {
 
 export * from './align.js';
 export * from './baseline.js';
+export * from './correlate.js';
 export * from './errors.js';
 export * from './next-step.js';
 export * from './parse-script.js';
@@ -34,15 +35,6 @@ export * from './tokenize.js';
  * ------------------------------------------------------------------------ */
 
 const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
-
-/** tool 3b: THE BRANCH. Cross-references script intent against delivery signal. */
-export function correlateSegments(
-  _signal: DeliverySignal,
-  _segments: ScriptSegment[],
-  _alignments: SegmentAlignment[],
-): CorrelationResult {
-  throw new Error(`correlateSegments: ${PENDING}`);
-}
 
 /** tool 4: generate_summary */
 export function generateSummary(
