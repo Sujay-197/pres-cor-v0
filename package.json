@@ -1,0 +1,19 @@
+{
+  "name": "nsh-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:widget": "npm run dev -w @nsh/widget",
+    "build:widget": "npm run build -w @nsh/widget",
+    "preview:widget": "npm run preview -w @nsh/widget",
+    "test:core": "npm test -w @nsh/core-logic",
+    "sync:contracts": "node scripts/sync-contracts.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

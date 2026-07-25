@@ -1,0 +1,123 @@
+{
+  "reportId": "report-rough-002",
+  "contractVersion": "1.0.0",
+  "durationSec": 69.8,
+  "audioUrl": "/fixtures/audio/rough-take.mp3",
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning everyone. Thanks for being here today.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 0.0,
+      "endSec": 6.8
+    },
+    {
+      "id": "seg-002",
+      "text": "I want to talk about the problem we noticed after running thirty customer interviews last quarter.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 6.8,
+      "endSec": 13.5
+    },
+    {
+      "id": "seg-003",
+      "text": "Our users are losing 2.3 hours per week, per person, to context switching between tools. That's not a feeling; that's from our anonymised product analytics panel of 4,800 active seats.",
+      "isKeyPoint": true,
+      "markedPause": true,
+      "startSec": 13.7,
+      "endSec": 28.9
+    },
+    {
+      "id": "seg-004",
+      "text": "Every product on the market claims to fix workflow. Most of them add another tab. We're doing something different.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 28.9,
+      "endSec": 39.6
+    },
+    {
+      "id": "seg-005",
+      "text": "Instead of another tool, we're adding a thin layer on top of what you already use. One keyboard shortcut, zero new accounts.",
+      "isKeyPoint": true,
+      "markedPause": false,
+      "startSec": 39.6,
+      "endSec": 51.3
+    },
+    {
+      "id": "seg-006",
+      "text": "We ran a closed beta with twelve teams for four weeks. The average time saved was exactly the number I led with: 2.3 hours per week per engineer.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 51.3,
+      "endSec": 63.1
+    },
+    {
+      "id": "seg-007",
+      "text": "If that sounds like something you'd want to try, I'd love to get you into the beta after this.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 63.1,
+      "endSec": 69.8
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "filler",
+      "severity": "medium",
+      "timestamp": 9.1,
+      "segmentId": "seg-002",
+      "detail": "Filler density high: \"um\" + \"like\" in the same segment (2 fillers)",
+      "rule": "filler_density_medium"
+    },
+    {
+      "id": "iss-002",
+      "type": "filler",
+      "severity": "medium",
+      "timestamp": 11.6,
+      "segmentId": "seg-002",
+      "detail": "\"you know\" filler mid-segment (segment already at 2 fillers)",
+      "rule": "filler_in_segment_medium"
+    },
+    {
+      "id": "iss-003",
+      "type": "pause",
+      "severity": "medium",
+      "timestamp": 13.9,
+      "segmentId": "seg-003",
+      "detail": "Script marked a pause before this line but your gap was 0.18s — below your 0.41s median gap. It reads as rushed into the key point.",
+      "rule": "marked_pause_skipped"
+    },
+    {
+      "id": "iss-004",
+      "type": "stress_mismatch",
+      "severity": "high",
+      "timestamp": 14.2,
+      "segmentId": "seg-003",
+      "detail": "180 WPM on your key stat vs your 131 WPM average (+1.8σ). Rising pitch across the line = the stat landed rushed, not emphatic.",
+      "rule": "stress_keypoint_rush"
+    },
+    {
+      "id": "iss-005",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 43.4,
+      "segmentId": "seg-005",
+      "detail": "108 WPM (slow drift vs 131 WPM baseline). Outside key points — minor flow dip.",
+      "rule": "pacing_slow_drift"
+    }
+  ],
+  "fillerCount": 4,
+  "avgPaceWpm": 131,
+  "status": "ready",
+  "nextStep": {
+    "type": "draft_note",
+    "recipient": "jordan.mentor@example.com",
+    "subject": "Can you watch me run through this pitch one more time?",
+    "bodyPreview": "Hi Jordan — I have a pitch Tuesday and just ran the coach on my rough take. The main thing it flagged…",
+    "fullBody": "Hi Jordan — I have a pitch Tuesday and just ran the coach on my rough take. The main thing it flagged: I rushed the 2.3-hours key stat and it came out more nervous than emphatic. Would you have 10 minutes tomorrow to watch me run it once more? No need to prepare, just listen for whether the key claim lands heavy or light. Thanks — really appreciate it.",
+    "executed": false,
+    "message": "No upcoming pitch event on the calendar. The fastest way to improve: ask a real person to watch your next run. Drafted a note below — you can send it as-is or tweak."
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "reportId": "report-clean-001",
+  "contractVersion": "1.0.0",
+  "durationSec": 72.5,
+  "audioUrl": "/fixtures/audio/clean-take.mp3",
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning everyone. Thanks for being here today.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 0.0,
+      "endSec": 7.2
+    },
+    {
+      "id": "seg-002",
+      "text": "I want to talk about the problem we noticed after running thirty customer interviews last quarter.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 7.2,
+      "endSec": 15.8
+    },
+    {
+      "id": "seg-003",
+      "text": "Our users are losing 2.3 hours per week, per person, to context switching between tools. That's not a feeling; that's from our anonymised product analytics panel of 4,800 active seats.",
+      "isKeyPoint": true,
+      "markedPause": true,
+      "startSec": 17.1,
+      "endSec": 32.4
+    },
+    {
+      "id": "seg-004",
+      "text": "Every product on the market claims to fix workflow. Most of them add another tab. We're doing something different.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 32.4,
+      "endSec": 41.9
+    },
+    {
+      "id": "seg-005",
+      "text": "Instead of another tool, we're adding a thin layer on top of what you already use. One keyboard shortcut, zero new accounts.",
+      "isKeyPoint": true,
+      "markedPause": false,
+      "startSec": 41.9,
+      "endSec": 53.1
+    },
+    {
+      "id": "seg-006",
+      "text": "We ran a closed beta with twelve teams for four weeks. The average time saved was exactly the number I led with: 2.3 hours per week per engineer.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 53.1,
+      "endSec": 65.4
+    },
+    {
+      "id": "seg-007",
+      "text": "If that sounds like something you'd want to try, I'd love to get you into the beta after this.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 65.4,
+      "endSec": 72.5
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 11.4,
+      "segmentId": "seg-002",
+      "detail": "1 filler (\"um\") in transition segment",
+      "rule": "filler_in_transition"
+    },
+    {
+      "id": "iss-002",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 45.8,
+      "segmentId": "seg-005",
+      "detail": "1 filler (\"so\") mid-segment, low density",
+      "rule": "filler_singleton"
+    }
+  ],
+  "fillerCount": 2,
+  "avgPaceWpm": 131,
+  "status": "ready",
+  "nextStep": {
+    "type": "calendar_reminder",
+    "eventTitle": "Product board pitch",
+    "eventIsoDate": "2026-07-28T14:00:00Z",
+    "leadMinutes": 30,
+    "message": "You have a pitch in 3 days. This report will be surfaced 30 minutes before the event so you can review.",
+    "executed": false,
+    "eventId": "cal-event-8821"
+  }
+}
