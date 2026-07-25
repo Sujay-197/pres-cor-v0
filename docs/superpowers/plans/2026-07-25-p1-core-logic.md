@@ -2922,18 +2922,15 @@ seg-003's marked pause. (3) rough `fillerCount` is 2: the tagged fillers are one
 matched the script (seg-006's legitimate uses), so clean has **0** fillers. (4) seg-006
 is suppressed in both takes by the duration guard despite being the fastest segment.
 
-> **⚠ Blocker to resolve before this fixture can land — `fixtures.test.ts:85`
-> ("exercises overlapping ticks").** That Tier-1 invariant requires two rough-take
-> issues within 0.5s of each other. In the *old* plan this was free: seg-003 was both
-> the marked-pause segment (pause tick at `startSec − 0.3`) and the rushed key point
-> (stress tick at `startSec`), giving two ticks 0.3s apart. In v3 that coincidence is
-> gone — seg-003 honours its pause (no pause tick) and the rush moved to seg-005 (no
-> marked pause there). The measured v3 issue timestamps above have a minimum gap of
-> ~2.9s, so the invariant **fails**. Do **not** weaken or edit `fixtures.test.ts`.
-> Resolving this needs a real decision by the owner (coordinate with P3): e.g. a
-> re-record where a key point is both rushed *and* preceded by a skipped marked pause,
-> or a P3-side change to that specific invariant. This amendment surfaces the conflict;
-> it does not paper over it by hand-editing the fixture (which Step 3 explicitly forbids).
+> **RESOLVED (owner decision, 2026-07-25): drop the invariant.** `fixtures.test.ts:85`
+> ("exercises overlapping ticks") required two rough-take issues within 0.5s. In the
+> old plan this was free (seg-003 carried both a pause tick and a stress tick, 0.3s
+> apart); in v3 the pause is honoured and the rush moved to seg-005, so the minimum
+> real gap is ~2.9s. The invariant's purpose is already served: P3's `layoutTicks`
+> clustering ships with its own unit tests (commit `32a2169` on this branch). Task 12
+> therefore **deletes that one test** from `fixtures.test.ts` (this is the only
+> sanctioned edit to that file — every other invariant stays), with a **Heads-up P3**
+> line in the commit message. Fixtures remain 100% honest to the real recordings.
 
 - [ ] **Step 3: Tune if the invariants fail**
 
