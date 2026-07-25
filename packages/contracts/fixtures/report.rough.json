@@ -1,0 +1,131 @@
+{
+  "reportId": "rpt-demo-rough",
+  "contractVersion": "1.0.0",
+  "durationSec": 45.8,
+  "audioUrl": "/fixtures/take-rough.wav",
+  "status": "ready",
+  "fillerCount": 6,
+  "avgPaceWpm": 128.9,
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning. I'm Sujay, and I lead engineering at Northwind Analytics.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-002",
+      "text": "Most retail teams still reconcile inventory by hand. It takes them four days a month.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-003",
+      "text": "We cut that to under six minutes, with a ninety-eight percent match rate.",
+      "isKeyPoint": true,
+      "markedPause": true
+    },
+    {
+      "id": "seg-004",
+      "text": "We did it by treating reconciliation as a matching problem, not a reporting problem.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-005",
+      "text": "Our first three pilots renewed. We're at forty thousand in annual recurring revenue after one quarter.",
+      "isKeyPoint": true,
+      "markedPause": false
+    },
+    {
+      "id": "seg-006",
+      "text": "I'd like to talk about what the next twelve months look like.",
+      "isKeyPoint": false,
+      "markedPause": false
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 7.9,
+      "segmentId": "seg-002",
+      "detail": "\"um\" on a setup line. Low stakes — no action needed."
+    },
+    {
+      "id": "iss-002",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 11.2,
+      "segmentId": "seg-002",
+      "detail": "\"you know\" on a setup line. Low stakes — no action needed."
+    },
+    {
+      "id": "iss-003",
+      "type": "pause",
+      "severity": "medium",
+      "timestamp": 13.9,
+      "segmentId": "seg-003",
+      "detail": "Your script marks a pause before this line. You left 0.4s — you normally leave 1.6s. The setup for your key stat lands flat."
+    },
+    {
+      "id": "iss-004",
+      "type": "stress_mismatch",
+      "severity": "high",
+      "timestamp": 14.2,
+      "segmentId": "seg-003",
+      "detail": "181 WPM vs your 129 WPM average — 40% faster, with pitch rising 18% across the line. This is your key stat and you delivered it like a caveat."
+    },
+    {
+      "id": "iss-005",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 20.9,
+      "segmentId": "seg-004",
+      "detail": "\"basically\" mid-explanation. Low stakes on its own."
+    },
+    {
+      "id": "iss-006",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 23.1,
+      "segmentId": "seg-004",
+      "detail": "\"sort of\" mid-explanation. Low stakes on its own."
+    },
+    {
+      "id": "iss-007",
+      "type": "filler",
+      "severity": "medium",
+      "timestamp": 25.0,
+      "segmentId": "seg-004",
+      "detail": "Third filler in this segment — 3 in 14 words. Density, not any single word, is what makes this one worth fixing."
+    },
+    {
+      "id": "iss-008",
+      "type": "filler",
+      "severity": "medium",
+      "timestamp": 28.4,
+      "segmentId": "seg-005",
+      "detail": "\"I mean\" immediately before your ARR number. A hedge in front of your second key claim."
+    },
+    {
+      "id": "iss-009",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 36.4,
+      "segmentId": "seg-006",
+      "detail": "118 WPM vs your 129 WPM average. Slight slow-down on the close — within normal drift."
+    }
+  ],
+  "nextStep": {
+    "kind": "calendar_reminder",
+    "rationale": "\"Northwind investor call\" is on your calendar in 2 days. One high-severity issue is unresolved (key stat at seg-003), so this report is worth re-reading close to the event rather than now.",
+    "executed": false,
+    "eventTitle": "Northwind investor call",
+    "eventStartsAt": "2026-07-27T14:00:00Z",
+    "recipientHint": null,
+    "draftSubject": null,
+    "draftBody": null
+  }
+}

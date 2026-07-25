@@ -1,0 +1,24 @@
+{
+  "name": "nsh",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Delivery-Correction Speech Coach Agent — NitroStack x MCP To The Moon",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "sync:contracts": "node scripts/sync-contracts.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

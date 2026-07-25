@@ -1,0 +1,75 @@
+{
+  "reportId": "rpt-demo-clean",
+  "contractVersion": "1.0.0",
+  "durationSec": 46.2,
+  "audioUrl": "/fixtures/take-clean.wav",
+  "status": "ready",
+  "fillerCount": 2,
+  "avgPaceWpm": 128.2,
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning. I'm Sujay, and I lead engineering at Northwind Analytics.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-002",
+      "text": "Most retail teams still reconcile inventory by hand. It takes them four days a month.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-003",
+      "text": "We cut that to under six minutes, with a ninety-eight percent match rate.",
+      "isKeyPoint": true,
+      "markedPause": true
+    },
+    {
+      "id": "seg-004",
+      "text": "We did it by treating reconciliation as a matching problem, not a reporting problem.",
+      "isKeyPoint": false,
+      "markedPause": false
+    },
+    {
+      "id": "seg-005",
+      "text": "Our first three pilots renewed. We're at forty thousand in annual recurring revenue after one quarter.",
+      "isKeyPoint": true,
+      "markedPause": false
+    },
+    {
+      "id": "seg-006",
+      "text": "I'd like to talk about what the next twelve months look like.",
+      "isKeyPoint": false,
+      "markedPause": false
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 7.1,
+      "segmentId": "seg-002",
+      "detail": "\"um\" on a setup line. Low stakes — no action needed."
+    },
+    {
+      "id": "iss-002",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 23.8,
+      "segmentId": "seg-004",
+      "detail": "\"sort of\" mid-explanation. Low stakes — no action needed."
+    }
+  ],
+  "nextStep": {
+    "kind": "draft_note",
+    "rationale": "No event on your calendar in the next 7 days, and this take is already clean (2 fillers, pace within 4% of your baseline). The remaining gains come from a live audience, not another solo run.",
+    "executed": false,
+    "eventTitle": null,
+    "eventStartsAt": null,
+    "recipientHint": "Priya (watched your last rehearsal)",
+    "draftSubject": "Could you watch my Northwind pitch once?",
+    "draftBody": "Hi Priya — I've rehearsed the Northwind pitch to the point where solo runs aren't teaching me much. Do you have 10 minutes this week to listen live and tell me where you stopped believing me?"
+  }
+}

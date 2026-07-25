@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // No ambient Node types on purpose. This package is imported by the browser
+    // widget, so `Buffer`, `process` and friends must not compile here — the
+    // guard is this line. Tests are excluded below and typed by vitest instead.
+    "types": []
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts"]
+}
