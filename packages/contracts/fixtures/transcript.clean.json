@@ -1,0 +1,601 @@
+{
+  "provider": "deepgram",
+  "durationSec": 26.819,
+  "words": [
+    {
+      "text": "good",
+      "start": 0.4,
+      "end": 0.8,
+      "confidence": 0.887,
+      "isFiller": false
+    },
+    {
+      "text": "morning",
+      "start": 0.8,
+      "end": 1.28,
+      "confidence": 0.669,
+      "isFiller": false
+    },
+    {
+      "text": "i'm",
+      "start": 1.28,
+      "end": 1.52,
+      "confidence": 0.819,
+      "isFiller": false
+    },
+    {
+      "text": "yutika",
+      "start": 1.52,
+      "end": 2,
+      "confidence": 0.656,
+      "isFiller": false
+    },
+    {
+      "text": "and",
+      "start": 2,
+      "end": 2.16,
+      "confidence": 0.617,
+      "isFiller": false
+    },
+    {
+      "text": "i",
+      "start": 2.16,
+      "end": 2.32,
+      "confidence": 0.97,
+      "isFiller": false
+    },
+    {
+      "text": "lead",
+      "start": 2.32,
+      "end": 2.56,
+      "confidence": 0.979,
+      "isFiller": false
+    },
+    {
+      "text": "engineering",
+      "start": 2.56,
+      "end": 2.96,
+      "confidence": 0.79,
+      "isFiller": false
+    },
+    {
+      "text": "at",
+      "start": 2.96,
+      "end": 3.2,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "northwind",
+      "start": 3.2,
+      "end": 3.68,
+      "confidence": 0.772,
+      "isFiller": false
+    },
+    {
+      "text": "analytics",
+      "start": 3.68,
+      "end": 4.56,
+      "confidence": 0.622,
+      "isFiller": false
+    },
+    {
+      "text": "most",
+      "start": 4.64,
+      "end": 4.96,
+      "confidence": 0.978,
+      "isFiller": false
+    },
+    {
+      "text": "retail",
+      "start": 4.96,
+      "end": 5.28,
+      "confidence": 0.97,
+      "isFiller": false
+    },
+    {
+      "text": "teams",
+      "start": 5.28,
+      "end": 5.68,
+      "confidence": 0.989,
+      "isFiller": false
+    },
+    {
+      "text": "still",
+      "start": 5.68,
+      "end": 6.16,
+      "confidence": 0.925,
+      "isFiller": false
+    },
+    {
+      "text": "reconcile",
+      "start": 6.16,
+      "end": 6.72,
+      "confidence": 0.929,
+      "isFiller": false
+    },
+    {
+      "text": "inventory",
+      "start": 6.72,
+      "end": 7.2,
+      "confidence": 0.987,
+      "isFiller": false
+    },
+    {
+      "text": "by",
+      "start": 7.2,
+      "end": 7.52,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "hand",
+      "start": 7.52,
+      "end": 8,
+      "confidence": 0.804,
+      "isFiller": false
+    },
+    {
+      "text": "it",
+      "start": 8,
+      "end": 8.16,
+      "confidence": 0.953,
+      "isFiller": false
+    },
+    {
+      "text": "takes",
+      "start": 8.16,
+      "end": 8.4,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "them",
+      "start": 8.4,
+      "end": 8.64,
+      "confidence": 0.928,
+      "isFiller": false
+    },
+    {
+      "text": "four",
+      "start": 8.64,
+      "end": 8.88,
+      "confidence": 0.987,
+      "isFiller": false
+    },
+    {
+      "text": "days",
+      "start": 8.88,
+      "end": 9.12,
+      "confidence": 0.996,
+      "isFiller": false
+    },
+    {
+      "text": "a",
+      "start": 9.12,
+      "end": 9.36,
+      "confidence": 0.989,
+      "isFiller": false
+    },
+    {
+      "text": "month",
+      "start": 9.36,
+      "end": 9.84,
+      "confidence": 0.878,
+      "isFiller": false
+    },
+    {
+      "text": "we",
+      "start": 9.84,
+      "end": 10,
+      "confidence": 0.973,
+      "isFiller": false
+    },
+    {
+      "text": "cut",
+      "start": 10,
+      "end": 10.24,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "that",
+      "start": 10.24,
+      "end": 10.4,
+      "confidence": 0.993,
+      "isFiller": false
+    },
+    {
+      "text": "to",
+      "start": 10.4,
+      "end": 10.64,
+      "confidence": 0.99,
+      "isFiller": false
+    },
+    {
+      "text": "under",
+      "start": 10.64,
+      "end": 10.88,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "six",
+      "start": 10.88,
+      "end": 11.2,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "minutes",
+      "start": 11.2,
+      "end": 11.44,
+      "confidence": 0.991,
+      "isFiller": false
+    },
+    {
+      "text": "with",
+      "start": 11.44,
+      "end": 11.68,
+      "confidence": 0.959,
+      "isFiller": false
+    },
+    {
+      "text": "a",
+      "start": 11.68,
+      "end": 11.84,
+      "confidence": 0.942,
+      "isFiller": false
+    },
+    {
+      "text": "ninety",
+      "start": 11.84,
+      "end": 12.08,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "eight",
+      "start": 12.08,
+      "end": 12.4,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "percent",
+      "start": 12.4,
+      "end": 12.72,
+      "confidence": 0.992,
+      "isFiller": false
+    },
+    {
+      "text": "match",
+      "start": 12.72,
+      "end": 13.12,
+      "confidence": 0.979,
+      "isFiller": false
+    },
+    {
+      "text": "rate",
+      "start": 13.12,
+      "end": 13.36,
+      "confidence": 0.917,
+      "isFiller": false
+    },
+    {
+      "text": "we",
+      "start": 13.605,
+      "end": 13.845,
+      "confidence": 0.517,
+      "isFiller": false
+    },
+    {
+      "text": "did",
+      "start": 13.845,
+      "end": 14.085,
+      "confidence": 0.996,
+      "isFiller": false
+    },
+    {
+      "text": "it",
+      "start": 14.085,
+      "end": 14.165,
+      "confidence": 0.993,
+      "isFiller": false
+    },
+    {
+      "text": "by",
+      "start": 14.165,
+      "end": 14.325,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "treating",
+      "start": 14.325,
+      "end": 14.645,
+      "confidence": 0.991,
+      "isFiller": false
+    },
+    {
+      "text": "the",
+      "start": 14.645,
+      "end": 14.805,
+      "confidence": 0.514,
+      "isFiller": false
+    },
+    {
+      "text": "reconciliation",
+      "start": 14.805,
+      "end": 15.445,
+      "confidence": 0.974,
+      "isFiller": false
+    },
+    {
+      "text": "as",
+      "start": 15.445,
+      "end": 15.685,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "a",
+      "start": 15.685,
+      "end": 15.845,
+      "confidence": 0.99,
+      "isFiller": false
+    },
+    {
+      "text": "matching",
+      "start": 15.845,
+      "end": 16.165,
+      "confidence": 0.998,
+      "isFiller": false
+    },
+    {
+      "text": "problem",
+      "start": 16.165,
+      "end": 16.565,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "and",
+      "start": 16.565,
+      "end": 16.805,
+      "confidence": 0.959,
+      "isFiller": false
+    },
+    {
+      "text": "not",
+      "start": 16.805,
+      "end": 17.045,
+      "confidence": 0.987,
+      "isFiller": false
+    },
+    {
+      "text": "a",
+      "start": 17.045,
+      "end": 17.125,
+      "confidence": 0.989,
+      "isFiller": false
+    },
+    {
+      "text": "reporting",
+      "start": 17.125,
+      "end": 17.525,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "problem",
+      "start": 17.525,
+      "end": 18.245,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "our",
+      "start": 18.245,
+      "end": 18.485,
+      "confidence": 0.696,
+      "isFiller": false
+    },
+    {
+      "text": "first",
+      "start": 18.485,
+      "end": 18.725,
+      "confidence": 0.998,
+      "isFiller": false
+    },
+    {
+      "text": "three",
+      "start": 18.725,
+      "end": 18.965,
+      "confidence": 0.998,
+      "isFiller": false
+    },
+    {
+      "text": "pilots",
+      "start": 18.965,
+      "end": 19.365,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "renewed",
+      "start": 19.365,
+      "end": 19.925,
+      "confidence": 0.993,
+      "isFiller": false
+    },
+    {
+      "text": "we",
+      "start": 19.925,
+      "end": 20.245,
+      "confidence": 0.568,
+      "isFiller": false
+    },
+    {
+      "text": "are",
+      "start": 20.245,
+      "end": 20.405,
+      "confidence": 0.923,
+      "isFiller": false
+    },
+    {
+      "text": "at",
+      "start": 20.405,
+      "end": 20.645,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "forty",
+      "start": 20.645,
+      "end": 20.965,
+      "confidence": 0.854,
+      "isFiller": false
+    },
+    {
+      "text": "thousand",
+      "start": 20.965,
+      "end": 21.285,
+      "confidence": 0.901,
+      "isFiller": false
+    },
+    {
+      "text": "in",
+      "start": 21.285,
+      "end": 21.605,
+      "confidence": 0.641,
+      "isFiller": false
+    },
+    {
+      "text": "annual",
+      "start": 21.605,
+      "end": 21.925,
+      "confidence": 0.988,
+      "isFiller": false
+    },
+    {
+      "text": "recurring",
+      "start": 21.925,
+      "end": 22.325,
+      "confidence": 0.998,
+      "isFiller": false
+    },
+    {
+      "text": "revenue",
+      "start": 22.325,
+      "end": 22.725,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "after",
+      "start": 22.725,
+      "end": 23.045,
+      "confidence": 0.989,
+      "isFiller": false
+    },
+    {
+      "text": "one",
+      "start": 23.045,
+      "end": 23.365,
+      "confidence": 0.99,
+      "isFiller": false
+    },
+    {
+      "text": "quarter",
+      "start": 23.365,
+      "end": 23.925,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "i'd",
+      "start": 23.925,
+      "end": 24.405,
+      "confidence": 0.832,
+      "isFiller": false
+    },
+    {
+      "text": "like",
+      "start": 24.405,
+      "end": 24.565,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "to",
+      "start": 24.565,
+      "end": 24.645,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "talk",
+      "start": 24.645,
+      "end": 24.885,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "about",
+      "start": 24.885,
+      "end": 25.045,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "what",
+      "start": 25.045,
+      "end": 25.285,
+      "confidence": 0.992,
+      "isFiller": false
+    },
+    {
+      "text": "the",
+      "start": 25.285,
+      "end": 25.445,
+      "confidence": 0.995,
+      "isFiller": false
+    },
+    {
+      "text": "next",
+      "start": 25.445,
+      "end": 25.685,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "twelve",
+      "start": 25.685,
+      "end": 25.925,
+      "confidence": 0.999,
+      "isFiller": false
+    },
+    {
+      "text": "months",
+      "start": 25.925,
+      "end": 26.165,
+      "confidence": 0.997,
+      "isFiller": false
+    },
+    {
+      "text": "look",
+      "start": 26.165,
+      "end": 26.485,
+      "confidence": 0.966,
+      "isFiller": false
+    },
+    {
+      "text": "like",
+      "start": 26.485,
+      "end": 28.005,
+      "confidence": 0.998,
+      "isFiller": false
+    }
+  ]
+}
