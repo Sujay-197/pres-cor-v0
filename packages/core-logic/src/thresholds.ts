@@ -1,4 +1,5 @@
 import type { Severity } from '@nsh/contracts';
+import { CoachError } from './errors.js';
 
 /** Tuned against the locked demo recordings. Task 12 revisits these. */
 export const THRESHOLDS = {
@@ -83,6 +84,9 @@ export const SEVERITY_RULES: ReadonlyArray<{
 
 export function ruleById(id: string) {
   const rule = SEVERITY_RULES.find((r) => r.id === id);
-  if (!rule) throw new Error(`unknown severity rule: ${id}`);
+  // An unknown rule id is a programming error, not a user-facing one, but it
+  // still must not surface as a raw Error across the tool boundary (Global
+  // Constraint #5). Throw a typed CoachError with the INTERNAL code.
+  if (!rule) throw new CoachError('INTERNAL', `unknown severity rule: ${id}`);
   return rule;
 }
