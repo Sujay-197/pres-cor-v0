@@ -38,6 +38,19 @@ export const ScriptSegment = z.object({
   isKeyPoint: z.boolean(),
   /** Author explicitly planned a pause here ([pause] in source). */
   markedPause: z.boolean(),
+  /**
+   * Optional per-segment audio timing. Absent on a freshly parsed script
+   * (parseScript sets neither); populated from the matching SegmentAlignment
+   * when a report is generated. The widget's ScriptPanel uses them for
+   * follow-along highlighting and a per-line time range, and degrades to "—"
+   * when absent.
+   *
+   * ADDITIVE Tier-1 proposal from P3 (asrith): optional, so no existing report,
+   * fixture, or consumer breaks. Flagged for group ack per CONVENTIONS §2 — not
+   * yet frozen. Population belongs to generateSummary (P1 Task 8), not here.
+   */
+  startSec: z.number().optional(),
+  endSec: z.number().optional(),
 });
 export type ScriptSegment = z.infer<typeof ScriptSegment>;
 
