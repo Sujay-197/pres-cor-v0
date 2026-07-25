@@ -23,6 +23,7 @@ import {
   type ContextProvider,
   type GmailConnector,
 } from './adapters/connectors.js';
+import { parseToolInput } from './tools/parse-input.js';
 import { parseScriptTool } from './tools/parse-script.tool.js';
 import { transcribeDeliveryTool } from './tools/transcribe-delivery.tool.js';
 import { correlateSegmentsTool } from './tools/correlate-segments.tool.js';
@@ -69,11 +70,15 @@ export function createDeps(cfg: AppConfig, overrides: Partial<ServerDeps> = {}):
   };
 }
 
+// No `execute` field: /api/analyze only ever proposes. Exposing the flag here
+// would let a caller (or a future route that forwards req.body wholesale)
+// turn this propose-only pipeline into one that fires a real connector. The
+// widget's confirm button reaches execution through
+// POST /api/tools/suggest_next_step instead.
 export const AnalyzeInput = z.object({
   takeId: z.string().min(1),
   script: z.string().optional(),
   now: z.string().optional(),
-  execute: z.boolean().optional(),
 });
 export type AnalyzeInput = z.infer<typeof AnalyzeInput>;
 
@@ -95,7 +100,7 @@ export async function analyze(
   input: z.input<typeof AnalyzeInput>,
   deps: ServerDeps,
 ): Promise<DeliveryReport> {
-  const { takeId, script, now, execute } = AnalyzeInput.parse(input);
+  const { takeId, script, now } = parseToolInput(AnalyzeInput, input, 'analyze');
   const audit = { takeId };
 
   const segments = await withAudit({ ...audit, tool: 'parse_script' }, deps.log, () =>
@@ -119,11 +124,11 @@ export async function analyze(
     }),
   );
 
+  // execute is always false here: /api/analyze proposes, it never acts. The
+  // widget's confirm button is what later calls suggestNextStepTool with
+  // execute: true via POST /api/tools/suggest_next_step.
   report.nextStep = await withAudit({ ...audit, tool: 'suggest_next_step' }, deps.log, () =>
-    suggestNextStepTool(
-      { report, takeId, now: now ?? deps.clock(), execute: execute ?? false },
-      deps,
-    ),
+    suggestNextStepTool({ report, takeId, now: now ?? deps.clock(), execute: false }, deps),
   );
 
   return report;

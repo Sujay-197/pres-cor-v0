@@ -7,6 +7,7 @@ import { loadConfig } from './config.js';
 import type { Logger } from './audit.js';
 import { FIXTURE_DIR } from './takes.js';
 import { analyze, audioUrlFor, createDeps, reportIdFor, type ServerDeps } from './pipeline.js';
+import type { CalendarConnector, GmailConnector } from './adapters/connectors.js';
 
 const NOW = '2026-07-25T09:00:00Z';
 const FIXTURE_ENV = { STT_PROVIDER: 'fixture', ENABLE_PROSODY: 'false' };
@@ -112,5 +113,48 @@ describe('analyze', () => {
     const report = await analyze({ takeId: 'rough' }, deps);
     expect(reads).toBe(1);
     expect(report.nextStep).toEqual(golden('rough').nextStep);
+  });
+
+  it('never executes a real connector, even if a caller smuggles execute:true past the type', async () => {
+    const calendarCalls: Array<[string, string]> = [];
+    const gmailCalls: Array<[string, string, string | null]> = [];
+    const calendar: CalendarConnector = {
+      createReminder: async (title, startsAt) => {
+        calendarCalls.push([title, startsAt]);
+        return { id: 'spy-event-1' };
+      },
+    };
+    const gmail: GmailConnector = {
+      draft: async (subject, body, to) => {
+        gmailCalls.push([subject, body, to]);
+        return { id: 'spy-draft-1' };
+      },
+    };
+    const deps = createDeps(loadConfig(FIXTURE_ENV), { calendar, gmail });
+
+    // `report.rough.json`'s nextStep.kind is 'calendar_reminder', so if
+    // `execute` ever reached suggestNextStepTool this would fire the spy.
+    // AnalyzeInput has no `execute` field at all — the cast is what a
+    // careless `/api/analyze` route forwarding req.body wholesale would do.
+    const report = await analyze({ takeId: 'rough', now: NOW, execute: true } as never, deps);
+
+    expect(report.nextStep!.executed).toBe(false);
+    expect(calendarCalls).toEqual([]);
+    expect(gmailCalls).toEqual([]);
+  });
+
+  it('rejects malformed input with a CoachError instead of a raw ZodError', async () => {
+    const { deps, lines } = depsWithLog();
+    let thrown: unknown;
+    try {
+      await analyze({ now: NOW } as never, deps);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    expect((thrown as CoachError).code).toBe('BAD_INPUT');
+    // No tool ran, so no audit line at all — the boundary rejected the input
+    // before the first withAudit-wrapped call.
+    expect(lines).toEqual([]);
   });
 });
