@@ -61,7 +61,10 @@ export default function App() {
   return (
     <div className="dev-shell">
       <header className="dev-header">
-        <h1>Delivery Coach · Timeline Widget (P3)</h1>
+        <div className="dev-header-brand">
+          <div className="dev-header-logo">E</div>
+          <h1>EcoSync</h1>
+        </div>
         <div className="fixture-tabs" role="tablist">
           {(['clean', 'rough', 'analyzing-then-clean', 'analyzing-then-rough'] as FixtureKey[]).map(k => (
             <button

@@ -106,6 +106,38 @@ export default function DeliveryTimelineWidget({ report, onNextStepExecute }: Pr
     <div className="widget widget-fade-in" role="region" aria-label="Delivery coach timeline">
       <audio ref={audioRef} src={safeAudioSrc} className="audio-wrap" controls />
       <div className="widget-inner">
+        <div className="hero-banner-grid">
+          <div className="hero-insight-card">
+            <div>
+              <span className="insight-badge">WEEKLY INSIGHT</span>
+              <h2 className="hero-insight-title">
+                Your efficiency rose by <span className="highlight">12%</span> since last Monday.
+              </h2>
+            </div>
+            <div className="hero-insight-stats">
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Avg. Daily Energy</span>
+                <span className="hero-stat-val">14.2 kWh</span>
+              </div>
+              <div className="hero-stat-item">
+                <span className="hero-stat-label">Avg. Daily Water</span>
+                <span className="hero-stat-val">420 L</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-emerald-card">
+            <div className="emerald-icon-row">
+              <span className="emerald-bolt-icon">⚡</span>
+              <span className="emerald-arrow-icon">↗</span>
+            </div>
+            <div>
+              <div className="emerald-val">-$42.00</div>
+              <div className="emerald-sub">Estimated Savings this month</div>
+            </div>
+          </div>
+        </div>
+
         <Timeline
           report={report}
           currentTime={currentTime}
