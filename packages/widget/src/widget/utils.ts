@@ -51,59 +51,51 @@ export type TickLayout = {
 const OVERLAP_WINDOW_SEC = 0.5;
 
 /**
- * Deterministic overlap resolution.
- * Inputs: issues sorted by timestamp ascending (iss-NNN order already does this).
- * Algorithm: sweep issues left→right. Each issue takes the first available "lane"
- * such that no issue in the lane is within OVERLAP_WINDOW_SEC. Lane index × -8 = topOffsetPx.
+ * Deterministic overlap resolution, in two independent passes over the
+ * timestamp-sorted issues:
+ *
+ * 1. Cluster: chain issues whose timestamps are within OVERLAP_WINDOW_SEC of
+ *    their neighbour (transitive — a run of 3+ overlapping ticks is one
+ *    cluster even though no two of them may land in the same lane). Drives
+ *    the "N" badge.
+ * 2. Ladder: each issue takes the first lane whose last-placed timestamp is
+ *    more than OVERLAP_WINDOW_SEC away, so overlapping ticks stay
+ *    independently clickable. `lane` maps straight to a `lane-N` CSS class
+ *    (see index.css) for vertical stacking — consumed directly by Timeline.tsx.
+ *
  * Same input → same output every run (no randomness).
  */
 export function layoutTicks(issues: DeliveryIssue[]): TickLayout[] {
   const sorted = [...issues].sort((a, b) => a.timestamp - b.timestamp);
-  const laneLast: number[] = [];  // last timestamp placed per lane
-  const laneClusters: Array<Array<{ ts: number; id: string }>> = [];
-  const out: TickLayout[] = [];
 
+  const clusters: DeliveryIssue[][] = [];
   for (const iss of sorted) {
-    let lane = 0;
-    while (true) {
-      const last = laneLast[lane];
-      if (last === undefined || iss.timestamp - last > OVERLAP_WINDOW_SEC) {
-        laneLast[lane] = iss.timestamp;
-        if (!laneClusters[lane]) laneClusters[lane] = [];
-        // cluster membership: detect if previous in same lane was cluster-mate or not
-        const prevInLane = laneClusters[lane][laneClusters[lane].length - 1];
-        if (prevInLane && iss.timestamp - prevInLane.ts <= OVERLAP_WINDOW_SEC) {
-          // extend cluster
-          const clusterMembers = [...out[findIssueIndex(out, prevInLane.id)].clusterMembers, iss.id];
-          // update prior tick clusterSize + members
-          const priorIdx = findIssueIndex(out, prevInLane.id);
-          out[priorIdx].clusterSize = clusterMembers.length;
-          out[priorIdx].clusterMembers = clusterMembers;
-          out.push({
-            issue: iss,
-            lane,
-            clusterSize: clusterMembers.length,
-            clusterMembers,
-          });
-        } else {
-          out.push({
-            issue: iss,
-            lane,
-            clusterSize: 1,
-            clusterMembers: [iss.id],
-          });
-        }
-        laneClusters[lane].push({ ts: iss.timestamp, id: iss.id });
-        break;
-      }
-      lane++;
+    const current = clusters[clusters.length - 1];
+    const prev = current?.[current.length - 1];
+    if (prev && iss.timestamp - prev.timestamp <= OVERLAP_WINDOW_SEC) {
+      current.push(iss);
+    } else {
+      clusters.push([iss]);
     }
   }
-  return out;
-}
+  const clusterMembersById = new Map<string, string[]>();
+  for (const cluster of clusters) {
+    const ids = cluster.map(i => i.id);
+    for (const iss of cluster) clusterMembersById.set(iss.id, ids);
+  }
 
-function findIssueIndex(arr: TickLayout[], id: string): number {
-  return arr.findIndex(t => t.issue.id === id);
+  const laneLast: number[] = [];  // last timestamp placed per lane
+  const out: TickLayout[] = [];
+  for (const iss of sorted) {
+    let lane = 0;
+    while (laneLast[lane] !== undefined && iss.timestamp - laneLast[lane] <= OVERLAP_WINDOW_SEC) {
+      lane++;
+    }
+    laneLast[lane] = iss.timestamp;
+    const clusterMembers = clusterMembersById.get(iss.id)!;
+    out.push({ issue: iss, lane, clusterSize: clusterMembers.length, clusterMembers });
+  }
+  return out;
 }
 
 export { SEVERITY_COLOR };

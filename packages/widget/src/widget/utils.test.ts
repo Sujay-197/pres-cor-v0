@@ -28,8 +28,8 @@ test('layoutTicks resolves 0.3s overlap with laddering + cluster membership', ()
   expect(layout.map(l => l.issue.id)).toEqual(['iss-001','iss-002','iss-003','iss-004','iss-005']);
   const iss003 = layout.find(l => l.issue.id === 'iss-003')!;
   const iss004 = layout.find(l => l.issue.id === 'iss-004')!;
-  // Ladder: iss-003 on baseline lane (0), iss-004 on lane 1 = -8px offset
-  expect(iss004.topOffsetPx).toBeLessThan(iss003.topOffsetPx);
+  // Ladder: iss-003 on baseline lane (0), iss-004 laddered up to lane 1
+  expect(iss004.lane).toBeGreaterThan(iss003.lane);
   expect(iss003.clusterSize).toBe(2);
   expect(iss004.clusterSize).toBe(2);
   expect(iss003.clusterMembers).toEqual(expect.arrayContaining(['iss-003','iss-004']));
@@ -48,8 +48,9 @@ test('layoutTicks is deterministic (same input = same output)', () => {
   ];
   const a = layoutTicks(issues);
   const b = layoutTicks([...issues].reverse()); // reverse to force internal sort
-  expect(a.map(l => [l.issue.id, l.topOffsetPx, l.clusterSize]))
-    .toEqual(b.map(l => [l.issue.id, l.topOffsetPx, l.clusterSize]));
+  expect(a.map(l => [l.issue.id, l.lane, l.clusterSize]))
+    .toEqual(b.map(l => [l.issue.id, l.lane, l.clusterSize]));
+  // a, b, c are each 0.2s apart — a chain of overlap even though they ladder into 3 lanes.
   const triple = a.filter(l => l.clusterSize === 3);
   expect(triple.length).toBe(3);
 });
