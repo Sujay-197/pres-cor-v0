@@ -21,15 +21,41 @@ export function computeBaseline(
   prosody: ProsodyTrack,
 ): Baseline {
   // Degraded segments would drag the baseline toward a pace the speaker never
-  // produced, since their span came from a proportional guess.
+  // produced, since their span came from a proportional guess. Their claimed
+  // word range is excluded from BOTH the numerator and the denominator below
+  // — counting the words without their time (or vice versa) would inflate or
+  // deflate WPM by construction, not by anything the speaker actually did.
   const usable = alignments.filter((a) => !a.degraded);
 
-  const voicedSec = usable.reduce((sum, a) => sum + (a.endSec - a.startSec), 0);
-  // Global non-filler word count, not a sum of per-segment slices: real ASR
-  // alignment leaves small gaps between consecutive segment spans (a word the
-  // aligner could not pin to either neighbour). Those words were still spoken
-  // in voiced time, so excluding them would understate the speaker's pace.
-  const contentWords = words.filter((w) => !w.isFiller).length;
+  // Numerator and denominator must walk the same word population. Two pools
+  // feed both: (1) words claimed by a usable segment's [wordIdxStart,
+  // wordIdxEnd) span, using that segment's own duration; (2) "seam" words —
+  // spoken but claimed by NO segment at all, usable or degraded — a real ASR
+  // alignment gap the Needleman-Wunsch pass couldn't pin to either neighbour.
+  // Seam words still happened in voiced time, so they're counted with their
+  // own [start, end) duration. Words claimed only by a DEGRADED segment fall
+  // into neither pool and are dropped entirely, per the comment above.
+  const claimed = new Set<number>();
+  for (const a of alignments) {
+    for (let i = a.wordIdxStart; i < a.wordIdxEnd; i++) claimed.add(i);
+  }
+
+  let seamVoicedSec = 0;
+  let seamContentWords = 0;
+  words.forEach((w, i) => {
+    if (claimed.has(i)) return; // covered by some segment — usable or degraded
+    seamVoicedSec += Math.max(w.end - w.start, 0);
+    if (!w.isFiller) seamContentWords++;
+  });
+
+  const usableVoicedSec = usable.reduce((sum, a) => sum + (a.endSec - a.startSec), 0);
+  const usableContentWords = usable.reduce(
+    (sum, a) => sum + words.slice(a.wordIdxStart, a.wordIdxEnd).filter((w) => !w.isFiller).length,
+    0,
+  );
+
+  const voicedSec = usableVoicedSec + seamVoicedSec;
+  const contentWords = usableContentWords + seamContentWords;
   const avgPaceWpm = voicedSec > 0 ? (contentWords / voicedSec) * 60 : 0;
 
   const paces = usable.map((a) => a.wpm);
@@ -51,12 +77,13 @@ export function computeBaseline(
 
   const rmsValues = usable.map((a) => a.meanRms);
   const medianPause = median(gaps);
+  const medianF0 = median(voicedF0);
 
   return {
     avgPaceWpm: r1(avgPaceWpm),
     paceStdDev: r1(Math.sqrt(variance)),
     meanRms: r1(rmsValues.length > 0 ? rmsValues.reduce((s, v) => s + v, 0) / rmsValues.length : 0),
-    medianF0: voicedF0.length > 0 ? r1(median(voicedF0) ?? 0) : null,
+    medianF0: medianF0 === null ? null : r1(medianF0),
     medianPauseSec: medianPause === null ? null : r1(medianPause),
   };
 }
