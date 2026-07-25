@@ -24,6 +24,7 @@ import type {
 } from '@nsh/contracts';
 
 export * from './errors.js';
+export * from './parse-script.js';
 export * from './thresholds.js';
 export * from './tokenize.js';
 
@@ -32,11 +33,6 @@ export * from './tokenize.js';
  * ------------------------------------------------------------------------ */
 
 const PENDING = 'not implemented yet — see docs/TEAM_PLANS.md (P1)';
-
-/** tool 1: parse_script */
-export function parseScript(_raw: string): ScriptSegment[] {
-  throw new Error(`parseScript: ${PENDING}`);
-}
 
 /** tool 2b: deterministic half of transcribe_delivery. Pure DSP. */
 export function extractProsody(_pcm: Float32Array, _sampleRate: number): ProsodyTrack {
