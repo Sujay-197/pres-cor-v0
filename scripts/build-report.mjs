@@ -6,6 +6,10 @@
 //
 // The fixture is NEVER hand-edited to match whatever the code produced — that
 // would delete the only signal telling us the rules are miscalibrated.
+//
+// The per-take NextStepContext used to be an inline constant here. It now lives
+// in packages/contracts/fixtures/next-step-context.json so the server's fixture
+// connectors read the same values and the two cannot drift (design §9).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,13 +21,7 @@ const dir = 'packages/contracts/fixtures';
 const script = parseScript(readFileSync(join(dir, 'script.demo.md'), 'utf8'));
 const prosody = { frames: [], frameHopSec: 0.01 };
 
-const CONTEXTS = {
-  rough: {
-    upcomingEvents: [{ title: 'Northwind investor call', startsAt: '2026-07-27T14:00:00Z' }],
-    knownMentor: null, now: '2026-07-25T09:00:00Z',
-  },
-  clean: { upcomingEvents: [], knownMentor: 'Priya', now: '2026-07-25T09:00:00Z' },
-};
+const CONTEXTS = JSON.parse(readFileSync(join(dir, 'next-step-context.json'), 'utf8'));
 
 for (const label of ['clean', 'rough']) {
   const transcript = JSON.parse(readFileSync(join(dir, `transcript.${label}.json`), 'utf8'));
