@@ -91,10 +91,9 @@ export class DeepgramSttClient implements SttClient {
           Authorization: `Token ${this.apiKey}`,
           'Content-Type': mimeType,
         },
-        // Cast only: @types/node's Uint8Array<ArrayBufferLike> vs DOM's
-        // BodyInit (Uint8Array<ArrayBuffer>) is a type-level mismatch only —
-        // this passes the same bytes through unchanged.
-        body: audio as BodyInit,
+        // @types/node's Uint8Array is already a valid body for fetch.
+        // No cast needed; TypeScript infers the correct type.
+        body: audio,
       });
     } catch (cause) {
       throw new CoachError('STT_FAILED', 'Speech provider request failed.', {

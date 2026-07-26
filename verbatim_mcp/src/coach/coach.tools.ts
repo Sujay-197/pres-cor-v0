@@ -37,14 +37,12 @@ const SuggestSchema = z.object({
 /** Bridge ctx.logger (info/warn/error methods) to the adapters' Logger callback. */
 function toLogger(ctx: ExecutionContext): Logger {
   return (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
-    const fn = (ctx.logger as Record<string, ((m: string, meta?: unknown) => void) | undefined>)[level];
+    const fn = (ctx.logger as unknown as Record<string, ((m: string, meta?: unknown) => void) | undefined>)[level];
     fn?.(message, meta);
   };
 }
 
 @Controller()
-@UseFilters(CoachExceptionFilter)
-@UseInterceptors(AuditInterceptor)
 @Injectable({ deps: [CoachService] })
 export class CoachTools {
   constructor(private readonly coach: CoachService) {}
@@ -55,6 +53,8 @@ export class CoachTools {
     inputSchema: ParseScriptSchema,
     outputSchema: z.array(ScriptSegment),
   })
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async parseScript(input: z.infer<typeof ParseScriptSchema>, _ctx: ExecutionContext): Promise<ScriptSegment[]> {
     return this.coach.parseScriptText(input.raw);
   }
@@ -65,6 +65,8 @@ export class CoachTools {
     inputSchema: TranscribeSchema,
     outputSchema: DeliverySignal,
   })
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async transcribeDelivery(input: z.infer<typeof TranscribeSchema>, ctx: ExecutionContext): Promise<DeliverySignal> {
     const takeId = await this.coach.resolveUploadIfPresent(input);
     return this.coach.transcribe(takeId, toLogger(ctx));
@@ -76,6 +78,8 @@ export class CoachTools {
     inputSchema: CorrelateSchema,
     outputSchema: CorrelationResult,
   })
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async correlateSegments(input: z.infer<typeof CorrelateSchema>, _ctx: ExecutionContext): Promise<CorrelationResult> {
     return this.coach.correlate(input.signal, input.segments);
   }
@@ -86,6 +90,8 @@ export class CoachTools {
     inputSchema: SummarizeSchema,
     outputSchema: DeliveryReport,
   })
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async generateSummary(input: z.infer<typeof SummarizeSchema>, _ctx: ExecutionContext): Promise<DeliveryReport> {
     return this.coach.summarize(input.segments, input.correlation, input.signal, input.meta);
   }
@@ -97,6 +103,8 @@ export class CoachTools {
     outputSchema: NextStep,
   })
   @UseGuards(NextStepGuard)
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async suggestNextStep(input: z.infer<typeof SuggestSchema>, ctx: ExecutionContext): Promise<NextStep> {
     return this.coach.suggestNextStep(input, toLogger(ctx));
   }
@@ -108,6 +116,8 @@ export class CoachTools {
     outputSchema: DeliveryReport,
   })
   @Widget('delivery-timeline')
+  @UseFilters(CoachExceptionFilter)
+  @UseInterceptors(AuditInterceptor)
   async analyzeDelivery(input: z.infer<typeof AnalyzeSchema>, ctx: ExecutionContext): Promise<DeliveryReport> {
     return this.coach.analyze(input, toLogger(ctx));
   }

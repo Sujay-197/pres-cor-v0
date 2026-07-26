@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuditInterceptor } from './audit.interceptor.js';
 
 function ctx(toolName: string) {
-  const logs: unknown[] = [];
+  const logs: Array<[string, string, unknown?]> = [];
   return {
     context: { toolName, logger: { info: (m: string, meta?: unknown) => logs.push(['info', m, meta]), error: (m: string, meta?: unknown) => logs.push(['error', m, meta]) } } as never,
     logs,
