@@ -11,10 +11,14 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "sync:contracts": "node scripts/sync-contracts.mjs"
+    "sync:contracts": "node scripts/sync-contracts.mjs",
+    "dev": "concurrently -n server,widget -c cyan,magenta \"npm:dev:server\" \"npm:dev:widget\"",
+    "dev:server": "npm run dev --workspace @nsh/server",
+    "dev:widget": "npm run dev --workspace @nsh/widget"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "concurrently": "^9.1.0",
     "tsx": "^4.23.1",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

@@ -48,10 +48,52 @@ Then confirm the contract typechecks:
 npm run typecheck
 ```
 
-P3 needs neither — the fixtures in `packages/contracts/fixtures/` are
-schema-exact and can be imported directly from hour zero.
+## Running the demo
+
+One command brings up the server and the widget:
+
+```bash
+npm run dev
+```
+
+- Widget: <http://127.0.0.1:5173>
+- Server: <http://127.0.0.1:8787> (`GET /api/health` reports the effective adapter selection)
+
+Vite proxies `/api` to the server, so there is no CORS configuration. Pick a take
+in the header to analyse it live, or drop a recording onto the panel to upload
+and analyse a new one.
+
+`STT_PROVIDER` defaults to `fixture`, so a clean checkout runs **offline and
+deterministic**: the staged takes replay the frozen transcripts in
+`packages/contracts/fixtures/`. Live Deepgram is opt-in:
+
+```bash
+STT_PROVIDER=deepgram DEEPGRAM_API_KEY=... npm run dev
+```
+
+The key is read once, in `apps/server/src/config.ts`, and never logged. A
+missing key with `STT_PROVIDER=deepgram` fails at boot rather than mid-demo.
+
+`ENABLE_PROSODY=false` skips the ffmpeg decode entirely — useful if
+`ffmpeg-static` has no binary for your platform. Prosody only feeds the
+key-point rising-pitch check; every other rule derives from word timings.
+
+If the server is unreachable the widget falls back to the committed report
+fixtures rather than rendering nothing.
+
+## Tests
+
+```bash
+npm test
+```
+
+The one that matters most is `apps/server/src/integration.test.ts`: it boots the
+server in-process, posts to `/api/analyze` for both staged takes, and asserts
+the response deep-equals the committed golden report. It fails if any adapter,
+tool wrapper, or wiring step corrupts the pipeline.
 
 ## Status
 
-Hour 0 — scaffolding. The contract is drafted and awaiting the hour-1 freeze
-(see the gate at the top of [`docs/TEAM_PLANS.md`](docs/TEAM_PLANS.md)).
+Integration complete — the pipeline runs end-to-end behind HTTP and the widget
+renders live reports. NitroStack decorators replace only the transport layer
+from here.
