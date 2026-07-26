@@ -1,0 +1,363 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { loadConfig } from './config.js';
+import { GENERIC_MESSAGE } from './errors.js';
+import { FIXTURE_DIR } from './takes.js';
+import { bootstrap } from './main.js';
+
+const AUDIO_BYTES = Buffer.from('0123456789abcdef');
+// Large enough that a client can read one chunk and abort before the local
+// loopback transfer finishes, so the mid-stream-abort test actually exercises
+// the abort path instead of racing a transfer that completes instantly.
+const BIG_AUDIO_BYTES = Buffer.alloc(8 * 1024 * 1024, 7);
+
+let base: string;
+let close: () => Promise<void>;
+let audioDir: string;
+let uploadDir: string;
+
+beforeAll(async () => {
+  const root = mkdtempSync(join(tmpdir(), 'nsh-http-'));
+  audioDir = join(root, 'audio');
+  uploadDir = join(audioDir, 'uploads');
+  mkdirSync(uploadDir, { recursive: true });
+  writeFileSync(join(audioDir, 'take-rough.m4a'), AUDIO_BYTES);
+  writeFileSync(join(audioDir, 'take-big.wav'), BIG_AUDIO_BYTES);
+
+  const booted = await bootstrap(
+    loadConfig({ PORT: '0', STT_PROVIDER: 'fixture', ENABLE_PROSODY: 'false', UPLOAD_MAX_BYTES: '64' }),
+    { audioDir, uploadDir, fixtureDir: FIXTURE_DIR, log: () => {} },
+  );
+  base = `http://127.0.0.1:${booted.port}`;
+  close = booted.close;
+});
+
+afterAll(async () => {
+  await close();
+});
+
+const postJson = (path: string, body: unknown): Promise<Response> =>
+  fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+describe('GET /api/health', () => {
+  it('reports readiness and the effective adapter selection, never the key', async () => {
+    const res = await fetch(`${base}/api/health`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({ ok: true, sttProvider: 'fixture', prosodyEnabled: false, deepgramKeyPresent: false });
+  });
+});
+
+describe('GET /api/takes', () => {
+  it('lists the staged takes with their frozen-transcript flag', async () => {
+    const res = await fetch(`${base}/api/takes`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { takes: Array<{ id: string; hasFrozenTranscript: boolean }> };
+    expect(body.takes.map((t) => t.id)).toContain('rough');
+    expect(body.takes.map((t) => t.id)).toContain('clean');
+    expect(body.takes.find((t) => t.id === 'rough')!.hasFrozenTranscript).toBe(true);
+  });
+});
+
+describe('GET /api/audio/:takeId', () => {
+  it('serves the whole file with a mime type and advertises range support', async () => {
+    const res = await fetch(`${base}/api/audio/rough`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('audio/mp4');
+    expect(res.headers.get('accept-ranges')).toBe('bytes');
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(AUDIO_BYTES);
+  });
+
+  it('honours a byte range so the scrubber can seek', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=4-7' } });
+    expect(res.status).toBe(206);
+    expect(res.headers.get('content-range')).toBe(`bytes 4-7/${AUDIO_BYTES.length}`);
+    expect(res.headers.get('content-length')).toBe('4');
+    expect(await res.text()).toBe('4567');
+  });
+
+  it('honours an open-ended range', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=12-' } });
+    expect(res.status).toBe(206);
+    expect(await res.text()).toBe('cdef');
+  });
+
+  it('honours a suffix range', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=-3' } });
+    expect(res.status).toBe(206);
+    expect(await res.text()).toBe('def');
+  });
+
+  it('rejects an unsatisfiable range with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=999-1000' } });
+    expect(res.status).toBe(416);
+    expect(res.headers.get('content-range')).toBe(`bytes */${AUDIO_BYTES.length}`);
+  });
+
+  it('rejects a non-numeric range with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=abc-' } });
+    expect(res.status).toBe(416);
+  });
+
+  it('rejects an inverted range (start past end) with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=500-100' } });
+    expect(res.status).toBe(416);
+  });
+
+  it('rejects a zero-length suffix range with 416', async () => {
+    const res = await fetch(`${base}/api/audio/rough`, { headers: { Range: 'bytes=-0' } });
+    expect(res.status).toBe(416);
+  });
+
+  it('404s a take with no audio on disk', async () => {
+    const res = await fetch(`${base}/api/audio/clean`);
+    expect(res.status).toBe(404);
+    expect((await res.json()) as unknown).toEqual({
+      error: { code: 'NOT_FOUND', message: 'No audio for take "clean".' },
+    });
+  });
+
+  it('404s a percent-encoded path-traversal attempt using forward slashes', async () => {
+    const res = await fetch(`${base}/api/audio/..%2f..%2f..%2fetc%2fpasswd`);
+    expect(res.status).toBe(404);
+  });
+
+  it('404s a percent-encoded path-traversal attempt using backslashes', async () => {
+    const res = await fetch(`${base}/api/audio/..%5c..%5cwindows%5cwin.ini`);
+    expect(res.status).toBe(404);
+  });
+
+  it('survives a client aborting mid-stream and keeps serving later requests', async () => {
+    const res = await fetch(`${base}/api/audio/big`);
+    expect(res.status).toBe(200);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+
+    // Give the server a beat to process the aborted connection before
+    // asserting it is still alive and answering normally.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const after = await fetch(`${base}/api/health`);
+    expect(after.status).toBe(200);
+  });
+});
+
+describe('POST /api/analyze', () => {
+  it('returns a live report for a staged take', async () => {
+    const res = await postJson('/api/analyze', { takeId: 'rough', now: '2026-07-25T09:00:00Z' });
+    expect(res.status).toBe(200);
+    const report = (await res.json()) as { reportId: string; audioUrl: string; issues: unknown[] };
+    expect(report.reportId).toBe('rpt-demo-rough');
+    expect(report.audioUrl).toBe('/api/audio/rough');
+    expect(report.issues).toHaveLength(6);
+  });
+
+  it('404s an unknown take', async () => {
+    const res = await postJson('/api/analyze', { takeId: 'nope' });
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+  });
+
+  it('400s a malformed body without leaking internals, as BAD_INPUT rather than BAD_REQUEST', async () => {
+    // AnalyzeInput is now validated via parseToolInput (see http.ts), so a
+    // schema rejection is a CoachError BAD_INPUT, not a raw ZodError mapped
+    // to the generic BAD_REQUEST. Only the code is asserted — the message is
+    // parseToolInput's own dynamic summary, not a fixed string.
+    const res = await postJson('/api/analyze', { takeId: 42 });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+    expect(body.error.message).not.toBe(GENERIC_MESSAGE);
+  });
+
+  it('maps SCRIPT_EMPTY to 400 with the CoachError message', async () => {
+    const res = await postJson('/api/analyze', { takeId: 'rough', script: '   ' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('SCRIPT_EMPTY');
+    expect(body.error.message).not.toBe(GENERIC_MESSAGE);
+  });
+
+  it('400s malformed JSON in the standard envelope without leaking a stack trace', async () => {
+    const res = await fetch(`${base}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"takeId":',
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Invalid request body.' } });
+    const raw = JSON.stringify(body);
+    expect(raw).not.toContain('SyntaxError');
+    expect(raw).not.toContain('node_modules');
+  });
+});
+
+describe('unmatched routes', () => {
+  it('404s in the standard envelope instead of the Express HTML page', async () => {
+    const res = await fetch(`${base}/api/definitely-not-a-route`);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('POST /api/tools/:name', () => {
+  it('runs a single named tool', async () => {
+    const res = await postJson('/api/tools/parse_script', { raw: 'One line.\n\nAnother line.' });
+    expect(res.status).toBe(200);
+    const segments = (await res.json()) as Array<{ id: string }>;
+    expect(segments.map((s) => s.id)).toEqual(['seg-001', 'seg-002']);
+  });
+
+  it('runs transcribe_delivery and returns a DeliverySignal', async () => {
+    const res = await postJson('/api/tools/transcribe_delivery', { takeId: 'rough' });
+    expect(res.status).toBe(200);
+    const signal = (await res.json()) as { transcript: { words: unknown[] }; prosody: { frames: unknown[] } };
+    expect(signal.transcript.words).toHaveLength(91);
+    expect(signal.prosody.frames).toEqual([]);
+  });
+
+  it('404s an unknown tool name', async () => {
+    const res = await postJson('/api/tools/definitely_not_a_tool', {});
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+  });
+
+  it('400s a body the tool schema rejects, as BAD_INPUT rather than BAD_REQUEST', async () => {
+    const res = await postJson('/api/tools/transcribe_delivery', { takeId: '' });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('BAD_INPUT');
+  });
+
+  it('502s an STT failure', async () => {
+    const res = await postJson('/api/tools/transcribe_delivery', { takeId: 'up-000000000000' });
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('STT_FAILED');
+  });
+
+  // TOOLS is a plain object literal, so bracket access without an explicit
+  // own-property guard resolves inherited Object.prototype members instead of
+  // undefined for these names — the dispatcher must not treat that as "found".
+  for (const name of ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty']) {
+    it(`404s "${name}" instead of dispatching to an inherited Object.prototype member`, async () => {
+      const res = await postJson(`/api/tools/${name}`, {});
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
+    });
+  }
+});
+
+describe('POST /api/uploads', () => {
+  it('stores the file under a content-hash take id and makes it discoverable', async () => {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from('tiny fake audio')], { type: 'audio/mpeg' }), 'clip.mp3');
+    const res = await fetch(`${base}/api/uploads`, { method: 'POST', body: form });
+    expect(res.status).toBe(200);
+    const { takeId } = (await res.json()) as { takeId: string };
+    expect(takeId.startsWith('up-')).toBe(true);
+
+    const takes = (await (await fetch(`${base}/api/takes`)).json()) as { takes: Array<{ id: string }> };
+    expect(takes.takes.map((t) => t.id)).toContain(takeId);
+
+    const audio = await fetch(`${base}/api/audio/${takeId}`);
+    expect(audio.status).toBe(200);
+    expect(audio.headers.get('content-type')).toBe('audio/mpeg');
+  });
+
+  it('413s a file over UPLOAD_MAX_BYTES before writing anything to disk', async () => {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.alloc(200, 7)], { type: 'audio/mpeg' }), 'big.mp3');
+    const res = await fetch(`${base}/api/uploads`, { method: 'POST', body: form });
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('UPLOAD_TOO_LARGE');
+  });
+
+  it('415s an unsupported container', async () => {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from('nope')], { type: 'audio/aiff' }), 'clip.aiff');
+    const res = await fetch(`${base}/api/uploads`, { method: 'POST', body: form });
+    expect(res.status).toBe(415);
+  });
+
+  it('400s a request with no file field', async () => {
+    const res = await fetch(`${base}/api/uploads`, { method: 'POST', body: new FormData() });
+    expect(res.status).toBe(400);
+  });
+});
+
+/**
+ * BAD_INPUT reaching the client AND an audit line — the fix for both halves
+ * of the same bug: the dispatch layer used to re-parse the already-validated
+ * body with a raw `.parse()` ahead of `withAudit`, so a schema rejection (a)
+ * came back as BAD_REQUEST (from sendError's ZodError branch) instead of the
+ * tools' own BAD_INPUT, and (b) never produced an audit line, because the
+ * raw parse threw before withAudit's callback ever ran. This suite boots its
+ * own server with a log recorder — the shared `base` above always boots with
+ * a no-op logger — so these are the only tests in this file that can see
+ * `tool.call` lines at all.
+ */
+describe('BAD_INPUT reaches the client and is audited', () => {
+  let auditBase: string;
+  let auditClose: () => Promise<void>;
+  let lines: Array<Record<string, unknown>>;
+
+  beforeAll(async () => {
+    lines = [];
+    const booted = await bootstrap(
+      loadConfig({ PORT: '0', STT_PROVIDER: 'fixture', ENABLE_PROSODY: 'false' }),
+      {
+        fixtureDir: FIXTURE_DIR,
+        log: (level, message, meta) => {
+          lines.push({ level, message, ...(meta ?? {}) });
+        },
+      },
+    );
+    auditBase = `http://127.0.0.1:${booted.port}`;
+    auditClose = booted.close;
+  });
+
+  afterAll(async () => {
+    await auditClose();
+  });
+
+  const auditPostJson = (path: string, body: unknown): Promise<Response> =>
+    fetch(`${auditBase}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('POST /api/tools/parse_script: malformed body -> 400 BAD_INPUT, and it is audited', async () => {
+    lines.length = 0;
+    const res = await auditPostJson('/api/tools/parse_script', { raw: 42 });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+
+    const toolLines = lines.filter((l) => l['message'] === 'tool.call');
+    expect(toolLines).toHaveLength(1);
+    expect(toolLines[0]).toMatchObject({ tool: 'parse_script', outcome: 'error', errorCode: 'BAD_INPUT' });
+  });
+
+  it('POST /api/analyze: malformed body -> 400 BAD_INPUT, and it is audited', async () => {
+    lines.length = 0;
+    const res = await auditPostJson('/api/analyze', { takeId: 42 });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+
+    const toolLines = lines.filter((l) => l['message'] === 'tool.call');
+    expect(toolLines).toHaveLength(1);
+    expect(toolLines[0]).toMatchObject({ tool: 'analyze', outcome: 'error', errorCode: 'BAD_INPUT' });
+  });
+});

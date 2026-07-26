@@ -279,6 +279,7 @@ result — if it does not, the extraction was wrong.
 
 | Code | Status | Meaning |
 |---|---|---|
+| `BAD_INPUT` | 400 | Request or tool input failed schema validation |
 | `SCRIPT_EMPTY` | 400 | Script text was blank |
 | `SCRIPT_NO_SEGMENTS` | 400 | Script parsed to zero segments |
 | `AUDIO_UNREADABLE` | 415 | Container could not be decoded |

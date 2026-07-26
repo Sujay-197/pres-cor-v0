@@ -1,0 +1,14 @@
+{
+  "rough": {
+    "upcomingEvents": [
+      { "title": "Northwind investor call", "startsAt": "2026-07-27T14:00:00Z" }
+    ],
+    "knownMentor": null,
+    "now": "2026-07-25T09:00:00Z"
+  },
+  "clean": {
+    "upcomingEvents": [],
+    "knownMentor": "Priya",
+    "now": "2026-07-25T09:00:00Z"
+  }
+}

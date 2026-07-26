@@ -104,7 +104,8 @@ construction.
 Never throw a raw `Error` across a tool boundary. Core logic throws
 `CoachError` with a stable `code`; the `@Tool` wrapper maps it to an MCP error.
 Codes we know we need: `SCRIPT_EMPTY`, `SCRIPT_NO_SEGMENTS`, `AUDIO_UNREADABLE`,
-`AUDIO_TOO_SHORT`, `STT_FAILED`, `ALIGNMENT_FAILED`.
+`AUDIO_TOO_SHORT`, `STT_FAILED`, `ALIGNMENT_FAILED`. `BAD_INPUT` (-> HTTP 400)
+covers the general case: request or tool input failed schema validation.
 
 Degrade rather than fail where it is honest to do so: no pitch track (silent or
 unvoiced audio) means we skip `stress_mismatch` checks and say so in the report,
