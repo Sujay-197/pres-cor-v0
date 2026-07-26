@@ -1,7 +1,6 @@
 'use client';
 
 import { WidgetLayout } from '@nitrostack/widgets';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 export default function RootLayout({
     children,
