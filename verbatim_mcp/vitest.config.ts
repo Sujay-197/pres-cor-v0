@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'fixtures/**/*.test.ts'],
     // The Next.js widget app has its own toolchain and its own tsconfig.
     exclude: ['node_modules', 'dist', 'src/widgets/**'],
   },
