@@ -1,0 +1,119 @@
+{
+  "reportId": "rpt-demo-rough",
+  "contractVersion": "1.0.0",
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning. I'm Sujay, and I lead engineering at Northwind Analytics.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 0.5,
+      "endSec": 7.5
+    },
+    {
+      "id": "seg-002",
+      "text": "Most retail teams still reconcile inventory by hand. It takes them four days a month.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 8.4,
+      "endSec": 18.5
+    },
+    {
+      "id": "seg-003",
+      "text": "We cut that to under six minutes, with a ninety-eight percent match rate.",
+      "isKeyPoint": true,
+      "markedPause": true,
+      "startSec": 19.3,
+      "endSec": 24.9
+    },
+    {
+      "id": "seg-004",
+      "text": "We did it by treating reconciliation as a matching problem, not a reporting problem.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 25.6,
+      "endSec": 30.1
+    },
+    {
+      "id": "seg-005",
+      "text": "Our first three pilots renewed. We're at forty thousand in annual recurring revenue after one quarter.",
+      "isKeyPoint": true,
+      "markedPause": false,
+      "startSec": 30.6,
+      "endSec": 35.6
+    },
+    {
+      "id": "seg-006",
+      "text": "I'd like to talk about what the next twelve months look like.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 35.7,
+      "endSec": 38
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 0.5,
+      "segmentId": "seg-001",
+      "detail": "94.3 WPM vs your 143.9 WPM average — noticeably slower than your usual pace."
+    },
+    {
+      "id": "iss-002",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 3.4,
+      "segmentId": "seg-001",
+      "detail": "\"like\" on a low-stakes line. Worth noting, not worth fixing."
+    },
+    {
+      "id": "iss-003",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 8.4,
+      "segmentId": "seg-002",
+      "detail": "106.9 WPM vs your 143.9 WPM average — noticeably slower than your usual pace."
+    },
+    {
+      "id": "iss-004",
+      "type": "filler",
+      "severity": "low",
+      "timestamp": 14,
+      "segmentId": "seg-002",
+      "detail": "\"like i mean\" on a low-stakes line. Worth noting, not worth fixing."
+    },
+    {
+      "id": "iss-005",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 25.6,
+      "segmentId": "seg-004",
+      "detail": "186.7 WPM vs your 143.9 WPM average — noticeably faster than your usual pace."
+    },
+    {
+      "id": "iss-006",
+      "type": "stress_mismatch",
+      "severity": "high",
+      "timestamp": 30.6,
+      "segmentId": "seg-005",
+      "detail": "180 WPM vs your 143.9 WPM average — 25% faster. This is a key point and you delivered it like a caveat."
+    }
+  ],
+  "fillerCount": 2,
+  "avgPaceWpm": 143.9,
+  "durationSec": 38.7,
+  "audioUrl": "/fixtures/take-rough.wav",
+  "status": "ready",
+  "nextStep": {
+    "executed": false,
+    "eventTitle": "Northwind investor call",
+    "eventStartsAt": "2026-07-27T14:00:00Z",
+    "recipientHint": null,
+    "draftSubject": null,
+    "draftBody": null,
+    "kind": "calendar_reminder",
+    "rationale": "\"Northwind investor call\" is on your calendar in 2 days. 1 high-severity issue is unresolved, so this report is worth re-reading close to the event."
+  }
+}

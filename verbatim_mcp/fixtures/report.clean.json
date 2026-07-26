@@ -1,0 +1,87 @@
+{
+  "reportId": "rpt-demo-clean",
+  "contractVersion": "1.0.0",
+  "segments": [
+    {
+      "id": "seg-001",
+      "text": "Good morning. I'm Sujay, and I lead engineering at Northwind Analytics.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 1.1,
+      "endSec": 7
+    },
+    {
+      "id": "seg-002",
+      "text": "Most retail teams still reconcile inventory by hand. It takes them four days a month.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 7.6,
+      "endSec": 13.1
+    },
+    {
+      "id": "seg-003",
+      "text": "We cut that to under six minutes, with a ninety-eight percent match rate.",
+      "isKeyPoint": true,
+      "markedPause": true,
+      "startSec": 14,
+      "endSec": 20.2
+    },
+    {
+      "id": "seg-004",
+      "text": "We did it by treating reconciliation as a matching problem, not a reporting problem.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 20.6,
+      "endSec": 26.4
+    },
+    {
+      "id": "seg-005",
+      "text": "Our first three pilots renewed. We're at forty thousand in annual recurring revenue after one quarter.",
+      "isKeyPoint": true,
+      "markedPause": false,
+      "startSec": 27.7,
+      "endSec": 36.2
+    },
+    {
+      "id": "seg-006",
+      "text": "I'd like to talk about what the next twelve months look like.",
+      "isKeyPoint": false,
+      "markedPause": false,
+      "startSec": 36.6,
+      "endSec": 39.9
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss-001",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 1.1,
+      "segmentId": "seg-001",
+      "detail": "111.9 WPM vs your 146.6 WPM average — noticeably slower than your usual pace."
+    },
+    {
+      "id": "iss-002",
+      "type": "pacing",
+      "severity": "low",
+      "timestamp": 7.6,
+      "segmentId": "seg-002",
+      "detail": "163.6 WPM vs your 146.6 WPM average — noticeably faster than your usual pace."
+    }
+  ],
+  "fillerCount": 0,
+  "avgPaceWpm": 146.6,
+  "durationSec": 40.9,
+  "audioUrl": "/fixtures/take-clean.wav",
+  "status": "ready",
+  "nextStep": {
+    "executed": false,
+    "eventTitle": null,
+    "eventStartsAt": null,
+    "recipientHint": "Priya (watched your last rehearsal)",
+    "draftSubject": "Could you watch this once?",
+    "draftBody": "Hi Priya — I've rehearsed this to the point where solo runs aren't teaching me much. Do you have 10 minutes this week to listen live and tell me where you stopped believing me?",
+    "kind": "draft_note",
+    "rationale": "Nothing on your calendar in the next 7 days. This take is already clean — the remaining gains come from a live audience, not another solo run."
+  }
+}
