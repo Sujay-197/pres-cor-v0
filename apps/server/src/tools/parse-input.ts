@@ -42,3 +42,37 @@ export function parseToolInput<T extends z.ZodTypeAny>(
     { issues },
   );
 }
+
+/**
+ * Validates a tool's return value against its own output schema right before
+ * it leaves the tool boundary, catching core-logic contract drift (a field
+ * renamed or dropped inside @nsh/core-logic without the tool boundary
+ * noticing) rather than letting it surface downstream as a confusing shape
+ * mismatch.
+ *
+ * Unlike parseToolInput, this never returns the schema's parsed value — only
+ * validates and, on success, returns void. A mismatch here is a programming
+ * error inside this codebase, not a caller mistake, so it maps to INTERNAL
+ * rather than BAD_INPUT; and callers keep returning their own original
+ * object rather than a schema-parsed copy, so this check cannot itself alter
+ * a byte-identical golden-fixture response.
+ */
+export function assertToolOutput<T extends z.ZodTypeAny>(
+  schema: T,
+  output: unknown,
+  toolName: string,
+): void {
+  const result = schema.safeParse(output);
+  if (result.success) return;
+
+  const issues = result.error.issues;
+  const summary = issues
+    .map((issue) => `"${issue.path.join('.') || '(root)'}" (${issue.code})`)
+    .join(', ');
+
+  throw new CoachError(
+    'INTERNAL',
+    `${toolName}: output failed contract validation at ${summary}.`,
+    { issues },
+  );
+}

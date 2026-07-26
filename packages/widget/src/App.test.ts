@@ -111,6 +111,16 @@ test('offlineReport serves the committed fixtures and nothing else', () => {
   expect(offlineReport('up-0123456789ab')).toBeNull();
 });
 
+test('offlineReport does not resolve inherited Object.prototype members via bracket access', () => {
+  // OFFLINE_FIXTURES is a plain object literal, so OFFLINE_FIXTURES['constructor']
+  // resolves to the Object constructor via the prototype chain unless the
+  // lookup is guarded with Object.hasOwn — this must take the normal
+  // "no fixture available" path instead of throwing DataCloneError out of
+  // structuredClone(Object).
+  expect(() => offlineReport('constructor')).not.toThrow();
+  expect(offlineReport('constructor')).toBeNull();
+});
+
 test('offlineReport returns a fresh clone each call so the widget cannot mutate the fixture', () => {
   const first = offlineReport('rough')!;
   first.issues.length = 0;

@@ -101,10 +101,22 @@ export const OFFLINE_TAKES: TakeOption[] = [
   { id: 'rough', label: 'Rough take', mimeType: 'audio/mp4', hasFrozenTranscript: true },
 ];
 
+/**
+ * OFFLINE_FIXTURES is a plain object literal, so it inherits from
+ * Object.prototype: `OFFLINE_FIXTURES['constructor']` resolves to the
+ * `Object` constructor rather than `undefined` via bracket access, even
+ * though 'constructor' is not a registered take id — and 'constructor'
+ * itself passes the server's take-id shape check, so a staged take with that
+ * name is not far-fetched. Without this guard, a server failure for that
+ * take would call `structuredClone(Object)`, which throws `DataCloneError`
+ * — inside a `.catch` handler, so it becomes an unhandled rejection instead
+ * of the offline fallback. `Object.hasOwn` makes the allow-list explicit,
+ * matching the same fix already applied in apps/server/src/http.ts and
+ * apps/server/src/adapters/connectors.ts.
+ */
 export function offlineReport(takeId: string): DeliveryReport | null {
-  const fixture = OFFLINE_FIXTURES[takeId];
-  if (fixture === undefined) return null;
-  return structuredClone(fixture) as DeliveryReport;
+  if (!Object.hasOwn(OFFLINE_FIXTURES, takeId)) return null;
+  return structuredClone(OFFLINE_FIXTURES[takeId]) as DeliveryReport;
 }
 
 /* ---------------------------------------------------------------------- *

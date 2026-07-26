@@ -19,7 +19,18 @@ export const AUDIO_DIR = join(REPO_ROOT, 'fixtures', 'audio');
 export const UPLOAD_DIR = join(AUDIO_DIR, 'uploads');
 export const FIXTURE_DIR = join(REPO_ROOT, 'packages', 'contracts', 'fixtures');
 
-/** Lifted verbatim from scripts/transcribe.mjs so both agree on what we accept. */
+/**
+ * Lifted verbatim from scripts/transcribe.mjs so both agree on what we accept.
+ *
+ * Both `mimeTypeForFile`'s bracket lookup and `uploadFilenameFor`'s `in` check
+ * below index this plain object literal with the result of `extname()`, which
+ * always returns either `''` or a string starting with `.` — never a bare
+ * prototype key like `constructor` or `__proto__` — so neither lookup can
+ * resolve an inherited Object.prototype member. This invariant is what makes
+ * the unguarded lookups safe; an `Object.hasOwn` guard is not needed here, but
+ * a future refactor that lets an extension reach this table unprocessed by
+ * `extname()` would need one.
+ */
 export const AUDIO_MIME_BY_EXT: Record<string, string> = {
   '.wav': 'audio/wav',
   '.mp3': 'audio/mpeg',

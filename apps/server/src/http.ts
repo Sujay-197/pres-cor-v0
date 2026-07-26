@@ -21,38 +21,63 @@ import {
   uploadTakeId,
 } from './takes.js';
 import { AnalyzeInput, analyze, type ServerDeps } from './pipeline.js';
+import { parseToolInput } from './tools/parse-input.js';
 import { ParseScriptInput, parseScriptTool } from './tools/parse-script.tool.js';
 import { TranscribeDeliveryInput, transcribeDeliveryTool } from './tools/transcribe-delivery.tool.js';
 import { CorrelateSegmentsInput, correlateSegmentsTool } from './tools/correlate-segments.tool.js';
 import { GenerateSummaryInput, generateSummaryTool } from './tools/generate-summary.tool.js';
 import { SuggestNextStepInput, suggestNextStepTool } from './tools/suggest-next-step.tool.js';
 
-type ToolHandler = (body: unknown, deps: ServerDeps) => Promise<unknown>;
+/**
+ * `schema` is parsed exactly ONCE per request, by the /api/tools/:name route
+ * below, via parseToolInput (never a raw `.parse()` — see that function for
+ * why a raw ZodError must never cross the tool boundary). `takeIdOf` and
+ * `run` both then receive the ALREADY-PARSED value: previously each entry's
+ * `run` re-parsed the raw body with a raw `.parse()` (bypassing
+ * parseToolInput entirely) and `takeIdOf` parsed it AGAIN with its own raw
+ * `.parse()` before that — two redundant raw parses per call, neither of
+ * which ever produced BAD_INPUT, and the `takeIdOf` one ran before
+ * `withAudit` could see a rejection at all.
+ */
+interface ToolEntry {
+  schema: z.ZodTypeAny;
+  /** Receives the value parseToolInput already returned — never re-parses. */
+  takeIdOf: (parsed: unknown) => string | null;
+  run: (parsed: unknown, deps: ServerDeps) => Promise<unknown>;
+}
 
-const TOOLS: Record<string, { takeIdOf: (body: unknown) => string | null; run: ToolHandler }> = {
+// Each `run`/`takeIdOf` casts the already-parsed value back to its own input
+// type: `schema` and the cast always name the same type, so this recovers
+// the precision `Record<string, ToolEntry>` erases at the table level — the
+// same trade the original per-entry `Schema.parse(body)` calls made, just
+// without re-validating.
+const TOOLS: Record<string, ToolEntry> = {
   parse_script: {
+    schema: ParseScriptInput,
     takeIdOf: () => null,
-    run: async (body) => parseScriptTool(ParseScriptInput.parse(body)),
+    run: async (parsed) => parseScriptTool(parsed as ParseScriptInput),
   },
   transcribe_delivery: {
-    takeIdOf: (body) => TranscribeDeliveryInput.parse(body).takeId,
-    run: (body, deps) => transcribeDeliveryTool(TranscribeDeliveryInput.parse(body), deps),
+    schema: TranscribeDeliveryInput,
+    takeIdOf: (parsed) => (parsed as TranscribeDeliveryInput).takeId,
+    run: (parsed, deps) => transcribeDeliveryTool(parsed as TranscribeDeliveryInput, deps),
   },
   correlate_segments: {
+    schema: CorrelateSegmentsInput,
     takeIdOf: () => null,
-    run: async (body) => correlateSegmentsTool(CorrelateSegmentsInput.parse(body)),
+    run: async (parsed) => correlateSegmentsTool(parsed as CorrelateSegmentsInput),
   },
   generate_summary: {
+    schema: GenerateSummaryInput,
     takeIdOf: () => null,
-    run: async (body) => generateSummaryTool(GenerateSummaryInput.parse(body)),
+    run: async (parsed) => generateSummaryTool(parsed as GenerateSummaryInput),
   },
   suggest_next_step: {
-    takeIdOf: (body) => SuggestNextStepInput.parse(body).takeId,
-    run: (body, deps) => suggestNextStepTool(SuggestNextStepInput.parse(body), deps),
+    schema: SuggestNextStepInput,
+    takeIdOf: (parsed) => (parsed as SuggestNextStepInput).takeId,
+    run: (parsed, deps) => suggestNextStepTool(parsed as SuggestNextStepInput, deps),
   },
 };
-
-export const TOOL_NAMES: readonly string[] = Object.keys(TOOLS);
 
 /**
  * `TOOLS` is a plain object literal, so it inherits from Object.prototype:
@@ -70,8 +95,14 @@ function sendNotFound(res: Response, message: string): void {
 }
 
 /**
- * A schema rejection is an HTTP concern, not a CoachError, so it is handled
- * here and mapError stays exactly the design §10 table.
+ * Every schema-validated body on this surface now goes through
+ * parseToolInput (AnalyzeInput and every /api/tools/:name schema — see the
+ * route handlers below), which converts a ZodError into a CoachError
+ * BAD_INPUT before it can reach here. This branch is kept as an unreachable
+ * backstop rather than deleted: mapError's default case turns any
+ * non-CoachError into a generic 500, and a raw ZodError is exactly the kind
+ * of internal-detail leak (§10) that must never happen even if a future
+ * route is added here without going through parseToolInput first.
  */
 function sendError(res: Response, err: unknown, deps: ServerDeps): void {
   if (err instanceof z.ZodError) {
@@ -243,8 +274,22 @@ export function createApp(deps: ServerDeps): Express {
   });
 
   app.post('/api/analyze', async (req, res) => {
+    // `meta` is shared with withAudit by reference: withAudit reads
+    // `meta.takeId` only AFTER the callback below settles, so setting it
+    // from inside the callback — once the body has actually been parsed —
+    // is what lets one line cover both a validation failure (still
+    // `takeId: null`, since a rejected body cannot be trusted) and a
+    // validated request. This is also what fixes the request body being
+    // parsed once, at the point an audit line can still be produced, rather
+    // than the old `AnalyzeInput.parse(req.body)` running unaudited here,
+    // ahead of the tool's own parseToolInput doing the same work again.
+    const meta = { tool: 'analyze', takeId: null as string | null };
     try {
-      const input = AnalyzeInput.parse(req.body);
+      const input = await withAudit(meta, deps.log, () => {
+        const parsed = parseToolInput(AnalyzeInput, req.body, 'analyze');
+        meta.takeId = parsed.takeId;
+        return parsed;
+      });
       const known = listTakes(deps.audioDir, deps.uploadDir, deps.fixtureDir).some((t) => t.id === input.takeId);
       if (!known) {
         sendNotFound(res, `Unknown take "${input.takeId}".`);
@@ -263,9 +308,18 @@ export function createApp(deps: ServerDeps): Express {
       sendNotFound(res, `Unknown tool "${name}".`);
       return;
     }
+    // Same shared-by-reference `meta` trick as /api/analyze above: the body
+    // is parsed exactly once, inside withAudit's callback, so a schema
+    // rejection is audited (previously `takeIdOf` parsed the raw body ahead
+    // of withAudit, so a rejection there produced no audit line at all) and
+    // `takeId` is real by the time the success/error line is written.
+    const meta = { tool: name, takeId: null as string | null };
     try {
-      const takeId = tool.takeIdOf(req.body);
-      const out = await withAudit({ tool: name, takeId }, deps.log, () => tool.run(req.body, deps));
+      const out = await withAudit(meta, deps.log, async () => {
+        const parsed = parseToolInput(tool.schema, req.body, name);
+        meta.takeId = tool.takeIdOf(parsed);
+        return tool.run(parsed, deps);
+      });
       res.json(out);
     } catch (err) {
       sendError(res, err, deps);

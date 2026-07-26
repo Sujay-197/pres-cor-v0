@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { CoachError } from '@nsh/core-logic';
-import { parseToolInput } from './parse-input.js';
+import { assertToolOutput, parseToolInput } from './parse-input.js';
 
 const Schema = z.object({
   name: z.string().min(1),
@@ -113,5 +113,41 @@ describe('parseToolInput', () => {
     }
     expect(thrown).toBeInstanceOf(CoachError);
     expect((thrown as CoachError).message).toContain('nested');
+  });
+});
+
+describe('assertToolOutput', () => {
+  it('returns void and does not throw when the value matches the schema', () => {
+    expect(() =>
+      assertToolOutput(Schema, { name: 'abc', count: 1, nested: { value: 'x' } }, 'someTool'),
+    ).not.toThrow();
+  });
+
+  it('throws a CoachError with code INTERNAL (not BAD_INPUT) when the value fails the schema', () => {
+    // A schema mismatch on the OUTPUT side is core-logic drifting from the
+    // contract it advertises — a bug in this codebase, not a caller mistake
+    // — so it must map to INTERNAL, unlike parseToolInput's BAD_INPUT.
+    let thrown: unknown;
+    try {
+      assertToolOutput(Schema, { name: 'abc', count: 'not-a-number', nested: { value: 'x' } }, 'someTool');
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    const err = thrown as CoachError;
+    expect(err.code).toBe('INTERNAL');
+    expect(err.message).toContain('someTool');
+    expect(err.message).toContain('count');
+  });
+
+  it('carries the full Zod issue list on context, same as parseToolInput', () => {
+    let thrown: unknown;
+    try {
+      assertToolOutput(Schema, { name: 123, nested: { value: 'x' } }, 'someTool');
+    } catch (err) {
+      thrown = err;
+    }
+    const { context } = thrown as CoachError;
+    expect(Array.isArray(context['issues'])).toBe(true);
   });
 });

@@ -10,7 +10,7 @@ import { CoachError } from '@nsh/core-logic';
 import { prosodyForFile } from '../adapters/audio-decode.js';
 import type { ServerDeps } from '../pipeline.js';
 import { resolveTakeAudio } from '../takes.js';
-import { parseToolInput } from './parse-input.js';
+import { assertToolOutput, parseToolInput } from './parse-input.js';
 
 export const TranscribeDeliveryInput = z.object({ takeId: z.string().min(1) });
 export type TranscribeDeliveryInput = z.infer<typeof TranscribeDeliveryInput>;
@@ -54,5 +54,7 @@ export async function transcribeDeliveryTool(
     log: deps.log,
   });
 
-  return { transcript, prosody };
+  const result: DeliverySignal = { transcript, prosody };
+  assertToolOutput(TranscribeDeliveryOutput, result, 'transcribeDeliveryTool');
+  return result;
 }

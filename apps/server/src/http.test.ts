@@ -165,12 +165,16 @@ describe('POST /api/analyze', () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
   });
 
-  it('400s a malformed body without leaking internals', async () => {
+  it('400s a malformed body without leaking internals, as BAD_INPUT rather than BAD_REQUEST', async () => {
+    // AnalyzeInput is now validated via parseToolInput (see http.ts), so a
+    // schema rejection is a CoachError BAD_INPUT, not a raw ZodError mapped
+    // to the generic BAD_REQUEST. Only the code is asserted — the message is
+    // parseToolInput's own dynamic summary, not a fixed string.
     const res = await postJson('/api/analyze', { takeId: 42 });
     expect(res.status).toBe(400);
-    expect((await res.json()) as unknown).toEqual({
-      error: { code: 'BAD_REQUEST', message: 'Invalid request body.' },
-    });
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+    expect(body.error.message).not.toBe(GENERIC_MESSAGE);
   });
 
   it('maps SCRIPT_EMPTY to 400 with the CoachError message', async () => {
@@ -229,10 +233,10 @@ describe('POST /api/tools/:name', () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NOT_FOUND');
   });
 
-  it('400s a body the tool schema rejects', async () => {
+  it('400s a body the tool schema rejects, as BAD_INPUT rather than BAD_REQUEST', async () => {
     const res = await postJson('/api/tools/transcribe_delivery', { takeId: '' });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('BAD_REQUEST');
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('BAD_INPUT');
   });
 
   it('502s an STT failure', async () => {
@@ -288,5 +292,72 @@ describe('POST /api/uploads', () => {
   it('400s a request with no file field', async () => {
     const res = await fetch(`${base}/api/uploads`, { method: 'POST', body: new FormData() });
     expect(res.status).toBe(400);
+  });
+});
+
+/**
+ * BAD_INPUT reaching the client AND an audit line — the fix for both halves
+ * of the same bug: the dispatch layer used to re-parse the already-validated
+ * body with a raw `.parse()` ahead of `withAudit`, so a schema rejection (a)
+ * came back as BAD_REQUEST (from sendError's ZodError branch) instead of the
+ * tools' own BAD_INPUT, and (b) never produced an audit line, because the
+ * raw parse threw before withAudit's callback ever ran. This suite boots its
+ * own server with a log recorder — the shared `base` above always boots with
+ * a no-op logger — so these are the only tests in this file that can see
+ * `tool.call` lines at all.
+ */
+describe('BAD_INPUT reaches the client and is audited', () => {
+  let auditBase: string;
+  let auditClose: () => Promise<void>;
+  let lines: Array<Record<string, unknown>>;
+
+  beforeAll(async () => {
+    lines = [];
+    const booted = await bootstrap(
+      loadConfig({ PORT: '0', STT_PROVIDER: 'fixture', ENABLE_PROSODY: 'false' }),
+      {
+        fixtureDir: FIXTURE_DIR,
+        log: (level, message, meta) => {
+          lines.push({ level, message, ...(meta ?? {}) });
+        },
+      },
+    );
+    auditBase = `http://127.0.0.1:${booted.port}`;
+    auditClose = booted.close;
+  });
+
+  afterAll(async () => {
+    await auditClose();
+  });
+
+  const auditPostJson = (path: string, body: unknown): Promise<Response> =>
+    fetch(`${auditBase}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('POST /api/tools/parse_script: malformed body -> 400 BAD_INPUT, and it is audited', async () => {
+    lines.length = 0;
+    const res = await auditPostJson('/api/tools/parse_script', { raw: 42 });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+
+    const toolLines = lines.filter((l) => l['message'] === 'tool.call');
+    expect(toolLines).toHaveLength(1);
+    expect(toolLines[0]).toMatchObject({ tool: 'parse_script', outcome: 'error', errorCode: 'BAD_INPUT' });
+  });
+
+  it('POST /api/analyze: malformed body -> 400 BAD_INPUT, and it is audited', async () => {
+    lines.length = 0;
+    const res = await auditPostJson('/api/analyze', { takeId: 42 });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('BAD_INPUT');
+
+    const toolLines = lines.filter((l) => l['message'] === 'tool.call');
+    expect(toolLines).toHaveLength(1);
+    expect(toolLines[0]).toMatchObject({ tool: 'analyze', outcome: 'error', errorCode: 'BAD_INPUT' });
   });
 });

@@ -13,7 +13,7 @@
 - Layering: `apps/server` imports `@nsh/contracts` and `@nsh/core-logic`; neither ever imports `apps/server`.
 - Never redeclare a contract type. Every type comes from `@nsh/contracts`.
 - Never throw a raw `Error` across a tool boundary — always `CoachError` with a code.
-- `CoachError.code` -> HTTP: `SCRIPT_EMPTY` 400, `SCRIPT_NO_SEGMENTS` 400, `AUDIO_UNREADABLE` 415, `AUDIO_TOO_SHORT` 422, `STT_FAILED` 502, `ALIGNMENT_FAILED` 422, `INTERNAL` 500.
+- `CoachError.code` -> HTTP: `BAD_INPUT` 400 (request or tool input failed schema validation), `SCRIPT_EMPTY` 400, `SCRIPT_NO_SEGMENTS` 400, `AUDIO_UNREADABLE` 415, `AUDIO_TOO_SHORT` 422, `STT_FAILED` 502, `ALIGNMENT_FAILED` 422, `INTERNAL` 500.
 - Response body on error is exactly `{ error: { code, message } }`. `CoachError.context` is logged, never returned.
 - `process.env` is read in exactly one place: `apps/server/src/config.ts`.
 - Env defaults: `PORT=8787`, `STT_PROVIDER=fixture`, `ENABLE_PROSODY=true`, `AUDIO_MAX_SECONDS=180`, `UPLOAD_MAX_BYTES=26214400`, `LOG_LEVEL=info`. `DEEPGRAM_API_KEY` has no default and is required when `STT_PROVIDER=deepgram` (checked at boot).

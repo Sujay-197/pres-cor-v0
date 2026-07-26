@@ -91,13 +91,26 @@ export async function prosodyForFile(req: ProsodyRequest): Promise<ProsodyTrack>
   if (!req.enabled || req.filePath === null) return emptyProsody();
 
   const decode = req.decode ?? ((path: string) => decodeWithFfmpeg(path));
+
+  // Only decode() is inside this try. DECODE FAILURE IS NOT FATAL (design
+  // §5.2) — a missing ffmpeg binary or an unreadable container degrades to
+  // an empty ProsodyTrack, logged as a warning, because every rule that
+  // currently fires derives from word timings alone. extractProsody's only
+  // throw, AUDIO_TOO_SHORT, is a different kind of failure: the recording
+  // itself is too short to analyse, which is a real, user-facing condition
+  // (-> 422 per design §10), not a decode hiccup — so it must propagate as a
+  // CoachError rather than be swallowed into a silently-empty track that
+  // would tell the user everything is fine. Widening this try to also cover
+  // extractProsody would make AUDIO_TOO_SHORT unreachable end-to-end.
+  let pcm: Float32Array;
   try {
-    const pcm = await decode(req.filePath);
-    return extractProsody(pcm, PROSODY_SAMPLE_RATE);
+    pcm = await decode(req.filePath);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     const errorCode = err instanceof CoachError ? err.code : 'DECODE_FAILED';
     req.log?.('warn', 'prosody.degraded', { errorCode, reason });
     return emptyProsody();
   }
+
+  return extractProsody(pcm, PROSODY_SAMPLE_RATE);
 }

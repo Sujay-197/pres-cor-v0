@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { DeliveryReport, NextStep } from '@nsh/contracts';
 import { decideNextStep } from '@nsh/core-logic';
 import type { ServerDeps } from '../pipeline.js';
-import { parseToolInput } from './parse-input.js';
+import { assertToolOutput, parseToolInput } from './parse-input.js';
 
 export const SuggestNextStepInput = z.object({
   report: DeliveryReport,
@@ -33,21 +33,26 @@ export async function suggestNextStepTool(
   const ctx = await deps.context.nextStepContext(takeId, now);
   const decided = decideNextStep(report, ctx);
 
-  if (!execute || decided.kind === 'none') return decided;
-
-  // The action is performed against the CONFIGURED connector, which is what
-  // makes executed:true honest even while the connectors are fixtures.
-  if (decided.kind === 'calendar_reminder') {
-    const { id } = await deps.calendar.createReminder(decided.eventTitle ?? '', decided.eventStartsAt ?? '');
-    deps.log('info', 'next_step.executed', { takeId, kind: decided.kind, externalId: id });
+  let result: NextStep;
+  if (!execute || decided.kind === 'none') {
+    result = decided;
   } else {
-    const { id } = await deps.gmail.draft(
-      decided.draftSubject ?? '',
-      decided.draftBody ?? '',
-      decided.recipientHint,
-    );
-    deps.log('info', 'next_step.executed', { takeId, kind: decided.kind, externalId: id });
+    // The action is performed against the CONFIGURED connector, which is what
+    // makes executed:true honest even while the connectors are fixtures.
+    if (decided.kind === 'calendar_reminder') {
+      const { id } = await deps.calendar.createReminder(decided.eventTitle ?? '', decided.eventStartsAt ?? '');
+      deps.log('info', 'next_step.executed', { takeId, kind: decided.kind, externalId: id });
+    } else {
+      const { id } = await deps.gmail.draft(
+        decided.draftSubject ?? '',
+        decided.draftBody ?? '',
+        decided.recipientHint,
+      );
+      deps.log('info', 'next_step.executed', { takeId, kind: decided.kind, externalId: id });
+    }
+    result = { ...decided, executed: true };
   }
 
-  return { ...decided, executed: true };
+  assertToolOutput(SuggestNextStepOutput, result, 'suggestNextStepTool');
+  return result;
 }

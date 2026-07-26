@@ -103,13 +103,35 @@ describe('prosodyForFile', () => {
     expect(String(lines[0]!['reason'])).toContain('ffmpeg-static');
   });
 
-  it('degrades to an empty track when the recording is too short for extractProsody', async () => {
-    const { log, lines } = recorder();
+  it('propagates AUDIO_TOO_SHORT from extractProsody instead of swallowing it into an empty track', async () => {
     // 1s < THRESHOLDS.minAudioSec, so extractProsody throws AUDIO_TOO_SHORT.
+    // decode() succeeds here — this is an analysis failure, not a decode
+    // failure — so prosodyForFile's narrower try (decode() only) must let it
+    // propagate as a real CoachError rather than degrading to an empty track,
+    // which is what made the documented AUDIO_TOO_SHORT -> 422 mapping
+    // unreachable before this split.
+    const { log, lines } = recorder();
     const decode: DecodeFn = async () => tone(1);
+    let thrown: unknown;
+    try {
+      await prosodyForFile({ filePath: '/any/take.m4a', enabled: true, decode, log });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(CoachError);
+    expect((thrown as CoachError).code).toBe('AUDIO_TOO_SHORT');
+    // Nothing was logged as degraded — this path never reaches the catch.
+    expect(lines).toEqual([]);
+  });
+
+  it('still degrades to an empty track and logs when decode() itself fails (unchanged from before the split)', async () => {
+    const { log, lines } = recorder();
+    const decode: DecodeFn = async () => {
+      throw new Error('ffmpeg-static binary missing for this platform');
+    };
     const track = await prosodyForFile({ filePath: '/any/take.m4a', enabled: true, decode, log });
     expect(track).toEqual(emptyProsody());
-    expect(lines[0]!['errorCode']).toBe('AUDIO_TOO_SHORT');
+    expect(lines[0]!['errorCode']).toBe('DECODE_FAILED');
   });
 
   it('never throws, whatever the decoder does', async () => {
