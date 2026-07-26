@@ -9,7 +9,8 @@ export type CoachErrorCode =
   | 'AUDIO_UNREADABLE'
   | 'AUDIO_TOO_SHORT'
   | 'STT_FAILED'
-  | 'ALIGNMENT_FAILED';
+  | 'ALIGNMENT_FAILED'
+  | 'INTERNAL';
 
 export class CoachError extends Error {
   constructor(

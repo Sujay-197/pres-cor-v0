@@ -38,6 +38,19 @@ export const ScriptSegment = z.object({
   isKeyPoint: z.boolean(),
   /** Author explicitly planned a pause here ([pause] in source). */
   markedPause: z.boolean(),
+  /**
+   * Optional per-segment audio timing. Absent on a freshly parsed script
+   * (parseScript sets neither); populated from the matching SegmentAlignment
+   * when a report is generated. The widget's ScriptPanel uses them for
+   * follow-along highlighting and a per-line time range, and degrades to "—"
+   * when absent.
+   *
+   * ADDITIVE Tier-1 proposal from P3 (asrith): optional, so no existing report,
+   * fixture, or consumer breaks. Flagged for group ack per CONVENTIONS §2 — not
+   * yet frozen. Population belongs to generateSummary (P1 Task 8), not here.
+   */
+  startSec: z.number().optional(),
+  endSec: z.number().optional(),
 });
 export type ScriptSegment = z.infer<typeof ScriptSegment>;
 
@@ -173,8 +186,29 @@ export const SegmentAlignment = z.object({
   meanF0: z.number().nullable(),
   /** Silence between the previous segment's last word and this one's first. */
   precedingPauseSec: z.number(),
+  /**
+   * True when this segment matched no script tokens and fell back to a
+   * proportional span. A degraded segment suppresses its own pacing and
+   * stress verdicts — proportional splitting assumes uniform WPM in order
+   * to measure WPM deviation, so feeding it the pacing rules would report a
+   * clean delivery rather than a broken one.
+   */
+  degraded: z.boolean(),
 });
 export type SegmentAlignment = z.infer<typeof SegmentAlignment>;
+
+/**
+ * Return of alignSegments. `words` carries `isFiller` finalised after
+ * soft-filler resolution, so the caller gets the updated words rather than a
+ * bare SegmentAlignment[]. Tier-2 (P1<->P2 seam), never shipped to the widget.
+ */
+export const AlignmentResult = z.object({
+  alignments: z.array(SegmentAlignment),
+  words: z.array(Word),
+  /** Matched script tokens / total script tokens. Below 0.4 alignSegments throws. */
+  matchRate: z.number(),
+});
+export type AlignmentResult = z.infer<typeof AlignmentResult>;
 
 /**
  * The speaker's own norms, computed from THIS recording — never a population
@@ -187,6 +221,12 @@ export const Baseline = z.object({
   paceStdDev: z.number(),
   meanRms: z.number(),
   medianF0: z.number().nullable(),
+  /**
+   * Median of all inter-word gaps exceeding THRESHOLDS.pauseMinSec. Inter-word
+   * rather than inter-segment: six segments give too few samples for a stable
+   * median. Null when the speaker never paused.
+   */
+  medianPauseSec: z.number().nullable(),
 });
 export type Baseline = z.infer<typeof Baseline>;
 
@@ -217,6 +257,8 @@ export const CorrelationResult = z.object({
   issues: z.array(DeliveryIssue),
   trace: z.array(DecisionTrace),
   baseline: Baseline,
+  /** Passthrough of the alignments correlateSegments was given, so generateSummary can stamp segment timings. */
+  alignments: z.array(SegmentAlignment),
 });
 export type CorrelationResult = z.infer<typeof CorrelationResult>;
 
@@ -257,6 +299,51 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
   high: '#ef4444',
 };
 
+/**
+ * Widget-facing display labels. Additive constants owned by P3, kept here so
+ * the timeline legend, summary card, and deck read from one source. Pure
+ * presentation — nothing in core-logic depends on these.
+ */
+export const SEVERITY_LABEL: Record<Severity, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
+export const ISSUE_TYPE_LABEL: Record<IssueType, string> = {
+  filler: 'Filler word',
+  pacing: 'Pacing drift',
+  stress_mismatch: 'Stress / emphasis mismatch',
+  pause: 'Pause',
+};
+
+/**
+ * Schemes the widget's <audio> element is allowed to load. Guards against a
+ * report smuggling a javascript: or file: URL into the scrubber. Relative
+ * paths (fixtures served by the dev server) are always allowed.
+ */
+export const AUDIO_URL_SCHEMES = ['http:', 'https:', 'blob:', 'data:'] as const;
+
+export function isAllowedAudioUrl(url: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('/')) return true;
+  try {
+    const u = new URL(url);
+    if (!AUDIO_URL_SCHEMES.includes(u.protocol as (typeof AUDIO_URL_SCHEMES)[number])) return false;
+    if (u.protocol === 'data:') {
+      const rest = u.pathname.slice(0, 32).toLowerCase();
+      return (
+        rest.startsWith('audio/') ||
+        rest.startsWith('video/') ||
+        rest.startsWith('application/octet-stream')
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Script markup understood by parseScript(). See CONVENTIONS.md. */
 export const SCRIPT_MARKUP = {
   /** Segments are separated by a blank line. */
@@ -287,13 +374,17 @@ export interface CoreLogic {
   extractProsody(pcm: Float32Array, sampleRate: number): ProsodyTrack;
 
   /** tool 3a: map each script segment onto its region of the recording. */
-  alignSegments(transcript: Transcript, segments: ScriptSegment[]): SegmentAlignment[];
+  alignSegments(
+    transcript: Transcript,
+    segments: ScriptSegment[],
+    prosody?: ProsodyTrack,
+  ): AlignmentResult;
 
   /** tool 3b: THE BRANCH. Cross-reference script intent against delivery signal. */
   correlateSegments(
     signal: DeliverySignal,
     segments: ScriptSegment[],
-    alignments: SegmentAlignment[],
+    alignment: AlignmentResult,
   ): CorrelationResult;
 
   /** tool 4: generate_summary */
