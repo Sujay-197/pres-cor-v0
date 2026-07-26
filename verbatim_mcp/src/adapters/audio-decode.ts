@@ -15,9 +15,7 @@ import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { ProsodyTrack } from '../domain/contracts/index.js';
 import { CoachError, extractProsody } from '../domain/core-logic/index.js';
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type Logger = (level: LogLevel, message: string, meta?: Record<string, unknown>) => void;
+import type { Logger } from '../common/logger.js';
 
 export const PROSODY_SAMPLE_RATE = 16_000;
 
