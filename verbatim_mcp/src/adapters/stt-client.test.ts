@@ -8,8 +8,8 @@ const fixtureDir = join(process.cwd(), 'fixtures');
 describe('FixtureSttClient', () => {
   it('replays the committed transcript for a known take', async () => {
     const c = new FixtureSttClient(fixtureDir, 'rough');
+    expect(c.provider).toBe('fixture');
     const t = await c.transcribe(new Uint8Array(0), 'audio/mp4');
-    expect(t.provider).toBe('fixture');
     expect(t.words.length).toBeGreaterThan(0);
   });
 
