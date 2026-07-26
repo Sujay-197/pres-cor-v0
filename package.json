@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "cd verbatim_mcp && npm ci && npm run build",
+    "start": "cd verbatim_mcp && npm run start:prod",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "sync:contracts": "node scripts/sync-contracts.mjs",
