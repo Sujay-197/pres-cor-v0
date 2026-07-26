@@ -1,28 +1,22 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
-import { PizzazModule } from './modules/pizzaz/pizzaz.module.js';
 
 /**
- * Root Application Module
- * 
- * Pizza shop finder with interactive maps.
- * Showcases NitroStack Widget SDK features.
+ * Root application module — Delivery-Correction Speech Coach.
+ * Feature modules are added in Task 16 (CoachModule) and Task 14 (JWTModule).
  */
 @McpApp({
-    module: AppModule,
-    server: {
-        name: 'pizzaz-finder',
-        version: '1.0.0'
-    },
-    logging: {
-        level: 'info'
-    }
+  module: AppModule,
+  server: {
+    name: 'delivery-coach',
+    version: '1.0.0',
+  },
+  logging: {
+    level: 'info',
+  },
 })
 @Module({
-    name: 'pizzaz',
-    description: 'Pizza shop finder with interactive maps',
-    imports: [
-        ConfigModule.forRoot(),
-        PizzazModule
-    ],
+  name: 'delivery-coach',
+  description: 'Corrects delivery mechanics against your own script',
+  imports: [ConfigModule.forRoot()],
 })
-export class AppModule { }
+export class AppModule {}
